@@ -1,0 +1,49 @@
+{
+  "name": "insta-scraper-studio",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dashboard": "node server.js",
+    "test": "node --test test/*.test.js",
+    "electron": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "id.naracitra.insta-scraper",
+    "productName": "Insta Scraper Studio",
+    "copyright": "Copyright © Naracitra",
+    "directories": {
+      "output": "release"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "package.json",
+      "server.js",
+      "lib/**/*",
+      "public/**/*",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "electron/assets/**/*"
+    ],
+    "win": {
+      "icon": "electron/assets/icon.ico",
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Insta Scraper Studio"
+    }
+  }
+}
