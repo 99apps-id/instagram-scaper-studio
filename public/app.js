@@ -6,6 +6,8 @@ let hasInstagramSession = false;
 
 const tableBody = document.getElementById('tableBody');
 const btnStartScrape = document.getElementById('btnStartScrape');
+const btnStopScrape = document.getElementById('btnStopScrape');
+const checkDeepScan = document.getElementById('checkDeepScan');
 const inputQuery = document.getElementById('inputQuery');
 const btnConnectIG = document.getElementById('btnConnectIG');
 const sessionStatusDot = document.getElementById('sessionStatusDot');
@@ -25,6 +27,17 @@ const licenseModal = document.getElementById('licenseModal');
 const btnContinueTrial = document.getElementById('btnContinueTrial');
 const btnActivateLicense = document.getElementById('btnActivateLicense');
 const licenseSerialInput = document.getElementById('licenseSerialInput');
+
+async function loadPersistedLeads() {
+  try {
+    const res = await fetch('/api/leads');
+    const data = await res.json();
+    if (Array.isArray(data.leads) && data.leads.length > 0) {
+      activeLeads = data.leads;
+      renderTable();
+    }
+  } catch {}
+}
 
 async function checkHealth() {
   try {
@@ -207,15 +220,22 @@ function connectSSE() {
       if (data.type === 'status') {
         if (data.running) {
           scrapeRadar.style.display = 'flex';
+          btnStopScrape.style.display = 'inline-flex';
+          btnStartScrape.disabled = true;
           radarStatus.textContent = data.message || 'Memproses pencarian...';
         } else {
           scrapeRadar.style.display = 'none';
+          btnStopScrape.style.display = 'none';
           btnStartScrape.disabled = false;
         }
       }
       if (data.type === 'lead') {
-        activeLeads.push(data.lead);
-        renderTable();
+        // Add if not seen
+        const exists = activeLeads.some(item => item.username?.toLowerCase() === data.lead.username?.toLowerCase());
+        if (!exists) {
+          activeLeads.push(data.lead);
+          renderTable();
+        }
         radarStatus.textContent = data.message;
         radarCounter.textContent = `${data.progress || 0}%`;
       }
@@ -243,6 +263,7 @@ async function triggerConnectInstagram() {
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   checkHealth();
+  loadPersistedLeads();
   fetchLicense();
   connectSSE();
 
@@ -255,35 +276,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const query = (inputQuery.value || '').trim();
     if (!query) return alert('Masukkan kata kunci pencarian');
+    const deepMode = checkDeepScan ? checkDeepScan.checked : false;
+
     btnStartScrape.disabled = true;
     scrapeRadar.style.display = 'flex';
+    if (btnStopScrape) btnStopScrape.style.display = 'inline-flex';
+
     radarStatus.textContent = `Mencari profil Instagram untuk: ${query}...`;
     radarCounter.textContent = '0%';
+
     try {
       const res = await fetch('/api/scrape/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query, deepMode })
       });
       if (!res.ok) {
         const err = await res.json();
         alert(err.error || 'Gagal memulai scraping');
         scrapeRadar.style.display = 'none';
+        if (btnStopScrape) btnStopScrape.style.display = 'none';
         btnStartScrape.disabled = false;
       }
     } catch {
       btnStartScrape.disabled = false;
       scrapeRadar.style.display = 'none';
+      if (btnStopScrape) btnStopScrape.style.display = 'none';
     }
   });
 
-  if (btnConnectIG) {
-    btnConnectIG.addEventListener('click', triggerConnectInstagram);
+  if (btnStopScrape) {
+    btnStopScrape.addEventListener('click', async () => {
+      btnStopScrape.disabled = true;
+      try {
+        await fetch('/api/scrape/stop', { method: 'POST', body: '{}' });
+      } catch {}
+      setTimeout(() => { btnStopScrape.disabled = false; }, 1000);
+    });
   }
 
-  if (btnBannerConnect) {
-    btnBannerConnect.addEventListener('click', triggerConnectInstagram);
-  }
+  if (btnConnectIG) btnConnectIG.addEventListener('click', triggerConnectInstagram);
+  if (btnBannerConnect) btnBannerConnect.addEventListener('click', triggerConnectInstagram);
 
   if (licensePill) licensePill.addEventListener('click', () => { licenseModal.hidden = false; loadPaymentPlans(); });
   if (btnContinueTrial) btnContinueTrial.addEventListener('click', async () => { await fetch('/api/license/onboard', { method: 'POST', body: '{}' }); fetchLicense(); });

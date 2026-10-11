@@ -1,7 +1,8 @@
 ﻿/**
  * Insta Scraper Studio — Web Dashboard Server
  * Security-hardened, license-aware, SSE telemetry, modular routes.
- * Mirrors google-maps-scrapper architecture.
+ * Dataset Persistence & Deep Scraping Engine.
+ * Selaras 100% dengan standar arsitektur GMST.
  */
 
 import http from 'http';
@@ -41,28 +42,35 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3001;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Path persistence session Instagram di folder data
-const SESSION_FILE = process.env.INSTA_SESSION_FILE || path.join(__dirname, 'instagram_session.json');
+const ENGINE_MODE = (process.env.ENGINE_MODE || 'local').toLowerCase();
+const ENGINE_URL = (process.env.ENGINE_URL || 'https://gmst.dewa.ai.id').replace(/\/+$/, '');
 
-// In-memory state
+// Session & Dataset Persistence
+const SESSION_FILE = process.env.INSTA_SESSION_FILE || path.join(__dirname, 'instagram_session.json');
+const CLIENT_DATASET_FILE = process.env.INSTA_DATASET_FILE || path.join(__dirname, 'dataset.json');
+
 let instagramSession = { sessionId: null, csrfToken: null, userId: null };
 let activeLeads = [];
+let seenUsernames = new Set();
 let isScraping = false;
+let currentScrapeJob = { abort: false, running: false };
 let sseClients = [];
 let serverStartTime = Date.now();
+let clientSaveTimer = null;
+let clientSaving = false;
 
-// Muat sesi tersimpan saat server start
+// Muat sesi Instagram tersimpan
 function loadPersistedSession() {
   try {
     if (fs.existsSync(SESSION_FILE)) {
       const data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
       if (data && data.sessionId) {
         instagramSession = data;
-        console.log('[Session] Sesi Instagram aktif dimuat dari penyimpanan persisten.');
+        console.log('[Session] Sesi Instagram aktif dimuat.');
       }
     }
   } catch (err) {
-    console.warn('[Session] Gagal memuat sesi Instagram:', err.message);
+    console.warn('[Session] Gagal membaca sesi:', err.message);
   }
 }
 loadPersistedSession();
@@ -71,28 +79,64 @@ function savePersistedSession(sessionData) {
   try {
     fs.mkdirSync(path.dirname(SESSION_FILE), { recursive: true });
     fs.writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2));
-    console.log('[Session] Sesi Instagram berhasil disimpan secara permanen.');
+    console.log('[Session] Sesi Instagram tersimpan.');
   } catch (err) {
     console.warn('[Session] Gagal menyimpan sesi:', err.message);
   }
 }
 
-// SSE broadcast with heartbeat
+// Muat dataset tersimpan
+function loadPersistedDataset() {
+  try {
+    if (fs.existsSync(CLIENT_DATASET_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(CLIENT_DATASET_FILE, 'utf8'));
+      const records = Array.isArray(raw) ? raw : (raw.records || []);
+      for (const item of records) {
+        if (!item || !item.username) continue;
+        const key = String(item.username).toLowerCase();
+        if (!seenUsernames.has(key)) {
+          seenUsernames.add(key);
+          activeLeads.push(item);
+        }
+      }
+      console.log(`[Dataset] Memuat ${activeLeads.length} leads dari arsip dataset lokal.`);
+    }
+  } catch (err) {
+    console.warn('[Dataset] Gagal membaca dataset lokal:', err.message);
+  }
+}
+loadPersistedDataset();
+
+function scheduleDatasetSave() {
+  if (clientSaving || clientSaveTimer) return;
+  clientSaveTimer = setTimeout(() => {
+    clientSaveTimer = null;
+    clientSaving = true;
+    try {
+      fs.mkdirSync(path.dirname(CLIENT_DATASET_FILE), { recursive: true });
+      fs.writeFileSync(CLIENT_DATASET_FILE, JSON.stringify({ savedAt: new Date().toISOString(), records: activeLeads }, null, 2));
+    } catch (err) {
+      console.warn('[Dataset] Gagal menyimpan dataset:', err.message);
+    } finally {
+      clientSaving = false;
+    }
+  }, 4000);
+}
+
+// SSE broadcast
 function broadcastSSE(data) {
   const payload = `data: ${JSON.stringify(data)}\n\n`;
   sseClients.forEach(c => {
-    try { c.write(payload); } catch { /* disconnected */ }
+    try { c.write(payload); } catch {}
   });
 }
 
-// Heartbeat interval
-const HEARTBEAT_INTERVAL = setInterval(() => {
+// Heartbeat
+setInterval(() => {
   broadcastSSE({ type: 'heartbeat', timestamp: Date.now() });
 }, 25000);
 
-// Server creation
 const server = http.createServer(async (req, res) => {
-  // Security headers on ALL responses
   setSecurityHeaders(res);
 
   let urlObj;
@@ -105,7 +149,6 @@ const server = http.createServer(async (req, res) => {
   }
   const pathname = urlObj.pathname;
 
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -116,11 +159,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ============================================================
-  // HEALTH CHECK (with token for Electron anti-collision)
-  // ============================================================
+  // Health check
   if (pathname === '/api/health' && req.method === 'GET') {
-    const lic = getLicenseStatus();
     const token = process.env.GMST_TOKEN || process.env.INSTA_TOKEN || null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -128,15 +168,14 @@ const server = http.createServer(async (req, res) => {
       leadsCount: activeLeads.length,
       token,
       hasSession: Boolean(instagramSession.sessionId),
+      engineMode: ENGINE_MODE,
       uptimeMs: Date.now() - serverStartTime,
       version: '0.1.0',
     }));
     return;
   }
 
-  // ============================================================
-  // SSE STREAM
-  // ============================================================
+  // SSE Stream
   if (pathname === '/api/stream' && req.method === 'GET') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -146,15 +185,11 @@ const server = http.createServer(async (req, res) => {
     });
     res.write('data: {"type":"connected"}\n\n');
     sseClients.push(res);
-    req.on('close', () => {
-      sseClients = sseClients.filter(c => c !== res);
-    });
+    req.on('close', () => { sseClients = sseClients.filter(c => c !== res); });
     return;
   }
 
-  // ============================================================
-  // SESSION COOKIE (Instagram login & persisten save)
-  // ============================================================
+  // Sesi Instagram
   if (pathname === '/api/session' && req.method === 'POST') {
     try {
       const payload = await readJsonBody(req);
@@ -169,19 +204,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ============================================================
-  // LEADS DATA
-  // ============================================================
+  // Leads Dataset
   if (pathname === '/api/leads' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ leads: activeLeads }));
     return;
   }
 
-  // ============================================================
-  // SCRAPE START (with rate limit guard & session verification)
-  // ============================================================
+  // STOP SCRAPE
+  if (pathname === '/api/scrape/stop' && req.method === 'POST') {
+    currentScrapeJob.abort = true;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, message: 'Scraping dihentikan.' }));
+    broadcastSSE({ type: 'status', running: false, aborted: true, message: 'Scraping dihentikan oleh pengguna.' });
+    return;
+  }
+
+  // START SCRAPE (Deep Scraping Engine dengan Rate Guard)
   if (pathname === '/api/scrape/start' && req.method === 'POST') {
+    if (process.env.DISABLE_ENGINE === '1') {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Modul scraping dinonaktifkan (integritas aplikasi tidak valid).', code: 'ENGINE_DISABLED' }));
+      return;
+    }
+
     const lic = getLicenseStatus();
     if (lic.blocked) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
@@ -194,46 +240,85 @@ const server = http.createServer(async (req, res) => {
       }));
       return;
     }
-    if (isScraping) {
+
+    if (currentScrapeJob.running) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Scraping sedang berjalan.' }));
+      res.end(JSON.stringify({ error: 'Tugas scraping lain sedang berjalan.' }));
       return;
     }
 
     try {
       const payload = await readJsonBody(req);
       const query = (payload.query || '').trim();
+      const deepMode = Boolean(payload.deepMode);
       if (!query) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Query wajib diisi' }));
         return;
       }
 
-      isScraping = true;
-      activeLeads = []; // Reset leads for new scrape
+      currentScrapeJob = { abort: false, running: true };
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, message: 'Scraping dimulai' }));
-      broadcastSSE({ type: 'status', running: true, message: `Mencari akun untuk: ${query}` });
+      res.end(JSON.stringify({ success: true, message: 'Scraping dimulai', deepMode }));
+      broadcastSSE({ type: 'status', running: true, message: `Mencari akun ${deepMode ? '(Deep Scan)' : ''} untuk: ${query}` });
 
-      // Background scraping job dengan Rate-Limit Guard & Adaptive Jitter
+      // Background scraping job
       (async () => {
         try {
-          const accounts = await searchInstagramAccounts(query, instagramSession);
-          broadcastSSE({ type: 'log', message: `Ditemukan ${accounts.length} akun potensial. Mengambil profil & analitik...` });
+          // Deep query expansion jika deepMode aktif
+          const queries = [query];
+          if (deepMode) {
+            queries.push(`${query} official`, `${query} store`, `${query} business`);
+          }
 
-          for (let i = 0; i < accounts.length; i++) {
-            const acc = accounts[i];
+          let allCandidates = [];
+          for (const q of queries) {
+            if (currentScrapeJob.abort) break;
+            try {
+              const accs = await searchInstagramAccounts(q, instagramSession);
+              allCandidates.push(...accs);
+            } catch {}
+          }
+
+          // Dedup kandidat
+          const uniqueAccounts = [];
+          const seenCandidate = new Set();
+          for (const a of allCandidates) {
+            if (!a.username) continue;
+            const u = a.username.toLowerCase();
+            if (!seenCandidate.has(u)) {
+              seenCandidate.add(u);
+              uniqueAccounts.push(a);
+            }
+          }
+
+          broadcastSSE({ type: 'log', message: `Ditemukan ${uniqueAccounts.length} akun potensial. Mengambil profil & kontak...` });
+
+          for (let i = 0; i < uniqueAccounts.length; i++) {
+            if (currentScrapeJob.abort) {
+              broadcastSSE({ type: 'log', message: 'Scraping dihentikan sebelum semua profil selesai.' });
+              break;
+            }
+
+            const acc = uniqueAccounts[i];
             try {
               const detail = await fetchInstagramProfile(acc.username, instagramSession);
-              activeLeads.push(detail);
+              const uKey = detail.username.toLowerCase();
+              if (!seenUsernames.has(uKey)) {
+                seenUsernames.add(uKey);
+                activeLeads.push(detail);
+                scheduleDatasetSave();
+              }
+
               broadcastSSE({
                 type: 'lead',
                 lead: detail,
-                progress: Math.round(((i + 1) / accounts.length) * 100),
-                message: `[${i + 1}/${accounts.length}] Selesai analisa @${detail.username} (${detail.followerCount.toLocaleString()} followers)`
+                progress: Math.round(((i + 1) / uniqueAccounts.length) * 100),
+                message: `[${i + 1}/${uniqueAccounts.length}] Selesai analisa @${detail.username} (${detail.followerCount.toLocaleString()} followers)`
               });
-              // Rate-Limit Guard: Jitter alami 2.2 - 4.2 detik antar profil
-              const delayMs = 2200 + Math.floor(Math.random() * 2000);
+
+              // Rate-Limit Guard alami
+              const delayMs = 2000 + Math.floor(Math.random() * 2000);
               await new Promise(r => setTimeout(r, delayMs));
             } catch (e) {
               broadcastSSE({ type: 'log', message: `Gagal ambil detail @${acc.username}: ${e.message}` });
@@ -242,29 +327,24 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           broadcastSSE({ type: 'log', message: `Error search: ${err.message}` });
         } finally {
-          isScraping = false;
-          broadcastSSE({ type: 'status', running: false, finished: true, totalLeads: activeLeads.length });
+          currentScrapeJob.running = false;
+          broadcastSSE({ type: 'status', running: false, finished: !currentScrapeJob.abort, totalLeads: activeLeads.length });
         }
       })();
     } catch (err) {
-      isScraping = false;
+      currentScrapeJob.running = false;
       res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
     }
     return;
   }
 
-  // ============================================================
   // EXPORT EXCEL
-  // ============================================================
   if (pathname === '/api/export' && req.method === 'GET') {
     const lic = getLicenseStatus();
     if (lic.blocked) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        error: 'Masa trial habis. Aktivasi untuk mengunduh data.',
-        code: 'LICENSE_REQUIRED',
-      }));
+      res.end(JSON.stringify({ error: 'Masa trial habis. Aktivasi untuk mengunduh data.', code: 'LICENSE_REQUIRED' }));
       return;
     }
 
@@ -278,7 +358,7 @@ const server = http.createServer(async (req, res) => {
       fs.createReadStream(tmpPath)
         .pipe(res)
         .on('finish', () => {
-          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+          try { fs.unlinkSync(tmpPath); } catch {}
         });
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -287,9 +367,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ============================================================
   // LICENSE ROUTES
-  // ============================================================
   if (pathname === '/api/license/status' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getLicenseStatus()));
@@ -335,9 +413,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ============================================================
   // PAYMENT ROUTES (Singapay)
-  // ============================================================
   if (pathname === '/api/payment/options' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' });
     res.end(JSON.stringify({ currency: 'IDR', claimUrl: CLAIM_PATH, plans: paymentOptions() }));
@@ -435,9 +511,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ============================================================
-  // STATIC FILE SERVING (path-traversal protected)
-  // ============================================================
+  // Static File Serving
   const safePath = safeStaticPath(pathname, PUBLIC_DIR);
   if (!safePath) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });

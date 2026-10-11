@@ -1,9 +1,9 @@
 ﻿/**
- * Insta Scraper Studio — Electron Main (Windows)
+ * Insta Scraper Studio — Electron Main
  * Frameless (frame:false), custom titlebar, no native menu.
- * Server (server.js) runs as child process with ELECTRON_RUN_AS_NODE
- * so single Electron binary runs both UI and API, dev and packaged.
- * Integrity check, single instance, custom port, logging.
+ * Child server execution, Single instance lock, Server logging stream,
+ * Integrity tripwire check, Engine mode passing.
+ * Selaras 100% dengan standar arsitektur GMST.
  */
 
 const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
@@ -22,12 +22,13 @@ const ICON_PNG = path.join(__dirname, 'assets', 'icon.png');
 let mainWindow = null;
 let serverProc = null;
 
-// Sesi dan lisensi tersimpan di folder userData agar persisten & tidak hilang saat app di-exit
+// UserData persistence (license, session, dataset, server logs)
 let userDataPath = path.join(ROOT_DIR, 'data');
 try {
   userDataPath = app.getPath('userData');
   process.env.LICENSE_FILE = path.join(userDataPath, 'license.json');
   process.env.INSTA_SESSION_FILE = path.join(userDataPath, 'instagram_session.json');
+  process.env.INSTA_DATASET_FILE = path.join(userDataPath, 'dataset.json');
 } catch {}
 
 function waitForServer(timeoutMs = 45000) {
@@ -50,9 +51,9 @@ function waitForServer(timeoutMs = 45000) {
       req.on('timeout', () => { req.destroy(); retry(); });
       function retry() {
         if (serverProc && serverProc.exitCode !== null) {
-          return reject(new Error('Server process exited unexpectedly.'));
+          return reject(new Error('Server anak berhenti mendadak.'));
         }
-        if (Date.now() - start > timeoutMs) return reject(new Error('Server startup timeout.'));
+        if (Date.now() - start > timeoutMs) return reject(new Error('Server timeout saat inisialisasi.'));
         setTimeout(tick, 800);
       }
     };
@@ -63,8 +64,9 @@ function waitForServer(timeoutMs = 45000) {
 function startServer() {
   return new Promise((resolve, reject) => {
     const serverJs = path.join(ROOT_DIR, 'server.js');
-    if (!fs.existsSync(serverJs)) return reject(new Error('server.js not found.'));
+    if (!fs.existsSync(serverJs)) return reject(new Error('server.js tidak ditemukan.'));
 
+    // Server logging stream ke file server.log di userData
     let logStream = null;
     try {
       fs.mkdirSync(userDataPath, { recursive: true });
@@ -77,8 +79,11 @@ function startServer() {
         PORT: String(PORT),
         INSTA_TOKEN: APP_TOKEN,
         INSTA_SESSION_FILE: path.join(userDataPath, 'instagram_session.json'),
+        INSTA_DATASET_FILE: path.join(userDataPath, 'dataset.json'),
         LICENSE_FILE: path.join(userDataPath, 'license.json'),
         ELECTRON_RUN_AS_NODE: '1',
+        ENGINE_MODE: app.isPackaged ? 'client' : (process.env.ENGINE_MODE || 'local'),
+        ENGINE_URL: process.env.ENGINE_URL || 'https://gmst.dewa.ai.id'
       },
       stdio: logStream ? ['ignore', logStream, logStream] : 'ignore',
       windowsHide: true,
@@ -114,6 +119,7 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// Window controls
 ipcMain.handle('window-control', (_evt, action) => {
   if (!mainWindow) return;
   if (action === 'minimize') mainWindow.minimize();
@@ -123,19 +129,20 @@ ipcMain.handle('window-control', (_evt, action) => {
   } else if (action === 'close') mainWindow.close();
 });
 
+// Open external URL di default browser OS
 ipcMain.handle('open-external', async (_evt, url) => {
   try {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
       await shell.openExternal(url);
       return { success: true };
     }
-    return { success: false, error: 'Invalid URL' };
+    return { success: false, error: 'URL tidak valid' };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
 
-// Instagram login popup & auto cookie capture (Menggunakan persist session partition)
+// Instagram login popup & auto cookie capture (Persistent partition)
 ipcMain.handle('connect-instagram', async () => {
   return new Promise((resolve) => {
     const authWindow = new BrowserWindow({
@@ -172,34 +179,7 @@ ipcMain.handle('connect-instagram', async () => {
   });
 });
 
-app.whenReady().then(async () => {
-  Menu.setApplicationMenu(null);
-  try {
-    await startServer();
-  } catch (err) {
-    dialog.showErrorBox('Insta Scraper Studio gagal dijalankan', `Server lokal error:\n${err.message}`);
-    app.quit();
-    return;
-  }
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (serverProc && serverProc.exitCode === null) {
-    try { serverProc.kill(); } catch {}
-  }
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('before-quit', () => {
-  if (serverProc && serverProc.exitCode === null) {
-    try { serverProc.kill(); } catch {}
-  }
-});
-
+// Single instance lock
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -207,6 +187,66 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(async () => {
+    Menu.setApplicationMenu(null);
+
+    const mainLog = (msg) => {
+      try {
+        fs.appendFileSync(path.join(userDataPath, 'main.log'), `[${new Date().toISOString()}] ${msg}\n`);
+      } catch {}
+    };
+
+    // Integrity tripwire check saat packaged
+    if (app.isPackaged) {
+      try {
+        const { checkIntegrity } = require('./integrity-check.cjs');
+        const asarPath = path.join(process.resourcesPath, 'app.asar');
+        const engineUrl = (process.env.ENGINE_URL || 'https://gmst.dewa.ai.id').replace(/\/+$/, '');
+        const integrityUrl = process.env.INTEGRITY_URL || `${engineUrl}/integrity.json`;
+        const res = await checkIntegrity({ asarPath, integrityUrl });
+        if (res.checked && !res.ok) {
+          process.env.DISABLE_ENGINE = '1';
+          mainLog('integrity GAGAL (hash tak cocok) — engine dimatikan.');
+        } else if (res.checked) {
+          mainLog('integrity OK.');
+        } else {
+          mainLog(`integrity skipped (${res.reason}).`);
+        }
+      } catch (err) {
+        mainLog(`integrity skipped (error: ${err.message}).`);
+      }
+    }
+
+    try {
+      await startServer();
+      mainLog(`server OK (${SERVER_URL})`);
+    } catch (err) {
+      mainLog(`server GAGAL: ${err.message}`);
+      dialog.showErrorBox('Insta Scraper Studio gagal dijalankan', `Server lokal gagal start:\n${err.message}`);
+      app.quit();
+      return;
+    }
+
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (serverProc && serverProc.exitCode === null) {
+      try { serverProc.kill(); } catch {}
+    }
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('before-quit', () => {
+    if (serverProc && serverProc.exitCode === null) {
+      try { serverProc.kill(); } catch {}
     }
   });
 }

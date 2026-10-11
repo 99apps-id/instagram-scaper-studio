@@ -72,8 +72,15 @@
     <!-- QUERY HERO -->
     <div class="query-card">
       <input type="text" id="inputQuery" class="query-input" placeholder="Masukkan kata kunci atau hashtag target (cth: kuliner jogja, skincare jakarta, cafe bandung)...">
+      <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; font-weight: 600; color: var(--ink-secondary); cursor: pointer; user-select: none;">
+        <input type="checkbox" id="checkDeepScan" style="accent-color: var(--accent-rose); width: 15px; height: 15px;">
+        <span>Deep Matrix Scan</span>
+      </label>
       <button class="btn btn-primary" id="btnStartScrape">
         <span>Mulai Analisa</span>
+      </button>
+      <button class="btn btn-surface btn-sm" id="btnStopScrape" style="display: none; color: #be123c;">
+        <span>Stop</span>
       </button>
     </div>
 
@@ -175,3 +182,4 @@
   <script src="/app.js"></script>
 </body>
 </html>
+
