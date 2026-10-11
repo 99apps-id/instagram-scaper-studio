@@ -3,49 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Insta Scraper Studio | Instagram Business Intelligence & Leads Analytics</title>
+  <title>Insta Scraper Studio — Instagram Intelligence & Leads Analytics</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/styles.css">
-  <style>
-    :root {
-      --accent-primary: #e11d48; /* Instagram Rose/Magenta */
-      --accent-primary-hover: #be123c;
-    }
-    .badge-er { background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.75rem; }
-    .badge-viral { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.7rem; }
-  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-  <!-- CUSTOM TITLEBAR -->
+  <!-- TITLEBAR -->
   <div class="titlebar" id="appTitlebar" hidden>
     <div class="titlebar-drag">
-      <span class="titlebar-dot" style="background: #e11d48;"></span>
-      <span class="titlebar-text">Insta Scraper Studio — Business Intelligence & Leads</span>
-      <span class="titlebar-license" id="titlebarLicense"></span>
+      <span class="titlebar-dot"></span>
+      <span class="titlebar-text">Insta Scraper Studio</span>
+      <span class="titlebar-license" id="titlebarLicense">Trial</span>
     </div>
     <div class="titlebar-controls">
-      <button class="titlebar-btn" id="winMinimize"><svg width="11" height="11" viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      <button class="titlebar-btn" id="winMaximize"><svg width="11" height="11" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      <button class="titlebar-btn titlebar-close" id="winClose"><svg width="11" height="11" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button class="titlebar-btn" id="winMinimize">－</button>
+      <button class="titlebar-btn" id="winMaximize">□</button>
+      <button class="titlebar-btn titlebar-close" id="winClose">✕</button>
     </div>
   </div>
 
+  <!-- NAVBAR -->
   <header class="navbar">
     <div class="nav-brand">
-      <div class="brand-logo-wrap">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-      </div>
-      <div class="brand-info">
+      <div>
         <h1>Insta Scraper Studio</h1>
         <p>Instagram Business Intelligence, Engagement & Leads Analytics</p>
       </div>
     </div>
-
     <div class="nav-actions">
       <button class="btn btn-surface btn-sm" id="btnConnectIG">
-        <span id="sessionStatusDot" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
-        <span id="sessionStatusText">Hubungkan Akun Instagram</span>
+        <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #a8a29e; display: inline-block;"></span>
+        <span id="sessionStatusText">Hubungkan Akun IG</span>
       </button>
 
       <button class="license-pill" id="licensePill">
@@ -60,88 +50,107 @@
   </header>
 
   <div class="app-container">
-    <!-- SEARCH PANEL -->
-    <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center;">
-      <input type="text" id="inputQuery" placeholder="Cari kata kunci atau hashtag (cth: kuliner jogja, skincare bandung, klinik gigi jakarta)..." style="flex: 1; padding: 0.6rem 0.85rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none;">
-      <button class="btn btn-primary" id="btnStartScrape" style="background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);">
-        <span>Mulai Analisa Leads</span>
+
+    <!-- QUERY HERO -->
+    <div class="query-card">
+      <input type="text" id="inputQuery" class="query-input" placeholder="Masukkan kata kunci atau hashtag target (cth: kuliner jogja, skincare jakarta, cafe bandung)...">
+      <button class="btn btn-primary" id="btnStartScrape">
+        <span>Mulai Analisa</span>
       </button>
     </div>
 
-    <!-- KPI STATS -->
-    <section class="kpi-row" style="margin-bottom: 1rem;">
-      <div class="kpi-card">
-        <div class="kpi-title">Total Profil Teranalisa</div>
-        <div class="kpi-number" id="kpiTotal">0</div>
-        <div class="kpi-sub">Akun bisnis & kreator</div>
+    <!-- RADAR PULSE ANIMATION SAAT SCRAPING AKTIF -->
+    <div class="scrape-radar" id="scrapeRadar">
+      <div class="radar-pulse-ring"></div>
+      <div style="flex: 1;">
+        <div style="font-size: 0.78rem; font-weight: 700; color: #9f1239;" id="radarTitle">Menggali Intelijen Instagram...</div>
+        <div style="font-size: 0.7rem; color: #be123c;" id="radarStatus">Menghubungkan ke API profil publik...</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Memiliki Kontak WhatsApp</div>
-        <div class="kpi-number" id="kpiWa">0</div>
-        <div class="kpi-sub" id="kpiWaPct">0% dari total leads</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Memiliki Email Bisnis</div>
-        <div class="kpi-number" id="kpiEmail">0</div>
-        <div class="kpi-sub">Email publik resmi</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Rata-rata Engagement Rate</div>
-        <div class="kpi-number" id="kpiAvgEr">0%</div>
-        <div class="kpi-sub">Interaksi 12 postingan terakhir</div>
-      </div>
-    </section>
-
-    <!-- LIVE TELEMETRY BAR -->
-    <div id="telemetryBox" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; margin-bottom: 1rem; font-size: 0.775rem; color: var(--ink-secondary); display: none;">
-      <span id="telemetryText">Menunggu perintah...</span>
+      <div style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #be123c;" id="radarCounter">0%</div>
     </div>
 
-    <!-- TABLE LEADS -->
-    <div class="table-container" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;">
-      <table class="data-table" style="width: 100%; border-collapse: collapse;">
+    <!-- KPI STATS -->
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <div class="kpi-label">Total Leads Teranalisa</div>
+        <div class="kpi-val" id="kpiTotal">0</div>
+        <div class="kpi-sub">Profil bisnis & kreator</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Kontak WhatsApp</div>
+        <div class="kpi-val" id="kpiWa">0</div>
+        <div class="kpi-sub" id="kpiWaPct">0% memiliki nomor seluler</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Email Bisnis</div>
+        <div class="kpi-val" id="kpiEmail">0</div>
+        <div class="kpi-sub">Alamat surat elektronik resmi</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Avg. Engagement Rate</div>
+        <div class="kpi-val" id="kpiAvgEr">0%</div>
+        <div class="kpi-sub">Rata-rata interaksi 12 post</div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="analytics-grid">
+      <div class="chart-box">
+        <div class="chart-title">
+          <span>Distribusi Followers vs Engagement Rate (%)</span>
+          <span style="font-size: 0.68rem; font-family: var(--font-sans); color: var(--ink-muted); font-weight: 500;">Metrik Interaksi Nyata</span>
+        </div>
+        <div style="height: 180px; position: relative;">
+          <canvas id="chartEngagement"></canvas>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">
+          <span>Topik & Hashtag Populer</span>
+          <span style="font-size: 0.68rem; font-family: var(--font-sans); color: var(--ink-muted); font-weight: 500;">Frekuensi Tagar</span>
+        </div>
+        <div style="height: 180px; position: relative;">
+          <canvas id="chartHashtags"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="table-wrap">
+      <table class="leads-table">
         <thead>
-          <tr style="background: var(--bg-subtle); text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted);">
-            <th style="padding: 0.65rem 0.85rem; width: 45px; text-align: center;">No</th>
-            <th style="padding: 0.65rem 0.85rem;">Profil Bisnis</th>
-            <th style="padding: 0.65rem 0.85rem;">Kategori</th>
-            <th style="padding: 0.65rem 0.85rem;">WhatsApp & Telepon</th>
-            <th style="padding: 0.65rem 0.85rem;">Email</th>
-            <th style="padding: 0.65rem 0.85rem; text-align: right;">Followers</th>
-            <th style="padding: 0.65rem 0.85rem; text-align: center;">Engagement Rate</th>
-            <th style="padding: 0.65rem 0.85rem;">Top Hashtags</th>
-            <th style="padding: 0.65rem 0.85rem; text-align: center;">Aksi</th>
+          <tr>
+            <th style="width: 40px; text-align: center;">No</th>
+            <th>Profil & Nama Bisnis</th>
+            <th>Kategori</th>
+            <th>WhatsApp / Kontak</th>
+            <th>Email</th>
+            <th style="text-align: right;">Followers</th>
+            <th style="text-align: center;">Engagement Rate</th>
+            <th>Topik Hashtags</th>
+            <th style="text-align: center;">Aksi</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="9" style="text-align: center; padding: 3rem; color: var(--ink-muted);">Belum ada data leads. Masukkan kata kunci di atas untuk mulai.</td></tr>
+          <tr><td colspan="9" style="text-align: center; padding: 3rem; color: var(--ink-muted);">Belum ada data leads. Masukkan kata kunci di atas untuk memulai pencarian.</td></tr>
         </tbody>
       </table>
     </div>
+
   </div>
 
   <!-- LICENSE MODAL -->
   <div class="license-backdrop" id="licenseModal" hidden>
     <div class="license-card">
-      <div class="license-brand">
-        <h2 id="licenseTitle">Aktivasi Insta Scraper Studio</h2>
-      </div>
-      <p class="license-desc" id="licenseDesc"></p>
+      <h2>Aktivasi Insta Scraper Studio</h2>
+      <p class="license-desc">Pilih paket langganan via QRIS Singapay atau masukkan kode aktivasi yang telah Anda miliki.</p>
 
-      <div class="license-plans-section">
-        <div class="license-plans-title">
-          <span>Pilih Paket Lisensi</span>
-          <span style="font-size: 0.65rem; color: var(--accent-emerald); font-weight: 700;">QRIS Singapay</span>
-        </div>
-        <div class="license-plans-grid" id="licensePlansGrid"></div>
-      </div>
+      <div class="license-plans-grid" id="licensePlansGrid"></div>
 
-      <div class="license-divider">Atau masukkan kode aktivasi</div>
-      <input type="text" id="licenseSerialInput" class="license-input" placeholder="Masukkan kode aktivasi" autocomplete="off" spellcheck="false" maxlength="24">
-      <div class="license-actions">
-        <button class="btn btn-primary" id="btnActivateLicense" style="width: 100%; justify-content: center;">Aktivasi Sekarang</button>
-      </div>
-      <button class="btn btn-surface" id="btnContinueTrial" style="width: 100%; justify-content: center; margin-top: 0.5rem;">Lanjutkan gratis 3 hari</button>
+      <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--ink-muted); margin-bottom: 0.35rem;">Kode Aktivasi</div>
+      <input type="text" id="licenseSerialInput" style="width: 100%; padding: 0.55rem; font-family: var(--font-mono); border: 1px solid var(--border-subtle); border-radius: 4px; margin-bottom: 0.75rem;" placeholder="GMST-XXXX-XXXXXX" spellcheck="false">
+      <button class="btn btn-primary" id="btnActivateLicense" style="width: 100%; justify-content: center; margin-bottom: 0.5rem;">Aktivasi Sekarang</button>
+      <button class="btn btn-surface btn-sm" id="btnContinueTrial" style="width: 100%; justify-content: center;">Lanjutkan Percobaan 3 Hari</button>
     </div>
   </div>
 

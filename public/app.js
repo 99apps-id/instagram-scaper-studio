@@ -1,14 +1,18 @@
 ﻿let activeLeads = [];
 let licenseState = null;
+let chartEngagement = null;
+let chartHashtags = null;
 
 const tableBody = document.getElementById('tableBody');
 const btnStartScrape = document.getElementById('btnStartScrape');
 const inputQuery = document.getElementById('inputQuery');
-const telemetryBox = document.getElementById('telemetryBox');
-const telemetryText = document.getElementById('telemetryText');
 const btnConnectIG = document.getElementById('btnConnectIG');
 const sessionStatusDot = document.getElementById('sessionStatusDot');
 const sessionStatusText = document.getElementById('sessionStatusText');
+
+const scrapeRadar = document.getElementById('scrapeRadar');
+const radarStatus = document.getElementById('radarStatus');
+const radarCounter = document.getElementById('radarCounter');
 
 const licensePill = document.getElementById('licensePill');
 const licenseDot = document.getElementById('licenseDot');
@@ -23,10 +27,10 @@ async function checkHealth() {
     const res = await fetch('/api/health');
     const data = await res.json();
     if (data.hasSession) {
-      sessionStatusDot.style.background = '#10b981';
+      sessionStatusDot.style.background = '#047857';
       sessionStatusText.textContent = 'Akun IG Terhubung';
     } else {
-      sessionStatusDot.style.background = '#94a3b8';
+      sessionStatusDot.style.background = '#a8a29e';
       sessionStatusText.textContent = 'Hubungkan Akun IG';
     }
   } catch {}
@@ -81,6 +85,78 @@ function updateKPIs() {
   document.getElementById('kpiWaPct').textContent = `${total > 0 ? Math.round((withWa / total) * 100) : 0}% memiliki nomor WA`;
   document.getElementById('kpiEmail').textContent = withEmail.toLocaleString('id-ID');
   document.getElementById('kpiAvgEr').textContent = `${avgEr}%`;
+
+  updateCharts();
+}
+
+function initCharts() {
+  if (typeof Chart === 'undefined') return;
+
+  const ctxEngage = document.getElementById('chartEngagement')?.getContext('2d');
+  if (ctxEngage) {
+    chartEngagement = new Chart(ctxEngage, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Engagement Rate (%)',
+          data: [],
+          backgroundColor: '#be123c',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  const ctxHash = document.getElementById('chartHashtags')?.getContext('2d');
+  if (ctxHash) {
+    chartHashtags = new Chart(ctxHash, {
+      type: 'doughnut',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: ['#be123c', '#e11d48', '#fb7185', '#fda4af', '#fecdd3']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
+      }
+    });
+  }
+}
+
+function updateCharts() {
+  if (!chartEngagement || !chartHashtags) return;
+
+  // 6 Akun teratas berdasarkan followers
+  const topAccounts = [...activeLeads].sort((a, b) => (b.followerCount || 0) - (a.followerCount || 0)).slice(0, 6);
+  chartEngagement.data.labels = topAccounts.map(a => `@${a.username}`);
+  chartEngagement.data.datasets[0].data = topAccounts.map(a => a.engagementRate || 0);
+  chartEngagement.update();
+
+  // Akumulasi Hashtag
+  const tagCounts = {};
+  activeLeads.forEach(l => {
+    (l.topHashtags || []).forEach(t => {
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    });
+  });
+  const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  chartHashtags.data.labels = sortedTags.map(s => s[0]);
+  chartHashtags.data.datasets[0].data = sortedTags.map(s => s[1]);
+  chartHashtags.update();
 }
 
 function renderTable() {
@@ -89,26 +165,26 @@ function renderTable() {
     return;
   }
   tableBody.innerHTML = activeLeads.map((l, idx) => {
-    const waLink = l.phone ? `<a href="https://wa.me/${l.phone}" target="_blank" class="tag tag-emerald" style="text-decoration:none;">Chat WA</a>` : '';
-    const emailLink = l.email ? `<a href="mailto:${l.email}" class="tag tag-blue" style="text-decoration:none;">Email</a>` : '-';
-    const topTags = (l.topHashtags || []).slice(0, 2).map(t => `<span class="badge-viral">${t}</span>`).join(' ') || '-';
+    const waLink = l.phone ? `<a href="https://wa.me/${l.phone}" target="_blank" class="btn btn-surface btn-sm" style="color: #047857; padding: 0.2rem 0.5rem; text-decoration: none;">Chat WA</a>` : '-';
+    const emailLink = l.email ? `<a href="mailto:${l.email}" style="color: #1d4ed8; text-decoration: none;">${l.email}</a>` : '-';
+    const tagsHtml = (l.topHashtags || []).slice(0, 3).map(t => `<span class="badge-tag">${t}</span>`).join(' ') || '-';
 
     return `
-      <tr style="border-bottom: 1px solid var(--border-light);">
-        <td style="padding: 0.65rem 0.85rem; text-align: center; color: var(--ink-muted);">${idx + 1}</td>
-        <td style="padding: 0.65rem 0.85rem;">
+      <tr>
+        <td style="text-align: center; color: var(--ink-muted); font-variant-numeric: tabular-nums;">${idx + 1}</td>
+        <td>
           <div style="font-weight: 700; color: var(--ink-primary);">${l.fullName || l.username}</div>
-          <a href="${l.profileUrl}" target="_blank" style="font-size: 0.75rem; color: var(--accent-rose); text-decoration: none;">@${l.username}</a>
+          <a href="${l.profileUrl}" target="_blank" style="font-size: 0.725rem; color: var(--accent-rose); text-decoration: none;">@${l.username}</a>
         </td>
-        <td style="padding: 0.65rem 0.85rem;"><span class="tag tag-subtle">${l.category}</span></td>
-        <td style="padding: 0.65rem 0.85rem;">
-          ${l.phone ? `<span style="font-family: var(--font-mono); font-size: 0.78rem;">${l.phone}</span>` : '<span style="color: var(--ink-faint);">-</span>'}
+        <td><span class="badge-tag">${l.category}</span></td>
+        <td>
+          ${l.phone ? `<span style="font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600;">${l.phone}</span>` : '<span style="color: var(--ink-faint);">-</span>'}
         </td>
-        <td style="padding: 0.65rem 0.85rem; font-size: 0.78rem;">${emailLink}</td>
-        <td style="padding: 0.65rem 0.85rem; text-align: right; font-weight: 600;">${(l.followerCount || 0).toLocaleString('id-ID')}</td>
-        <td style="padding: 0.65rem 0.85rem; text-align: center;"><span class="badge-er">${l.engagementRate || 0}%</span></td>
-        <td style="padding: 0.65rem 0.85rem;">${topTags}</td>
-        <td style="padding: 0.65rem 0.85rem; text-align: center;">${waLink || '-'}</td>
+        <td style="font-size: 0.76rem;">${emailLink}</td>
+        <td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">${(l.followerCount || 0).toLocaleString('id-ID')}</td>
+        <td style="text-align: center;"><span class="badge-er">${l.engagementRate || 0}%</span></td>
+        <td>${tagsHtml}</td>
+        <td style="text-align: center;">${waLink}</td>
       </tr>
     `;
   }).join('');
@@ -120,24 +196,27 @@ function connectSSE() {
   es.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
-      if (data.type === 'log' || data.type === 'status') {
-        telemetryBox.style.display = 'block';
-        telemetryText.textContent = data.message || 'Memproses...';
+      if (data.type === 'status') {
+        if (data.running) {
+          scrapeRadar.style.display = 'flex';
+          radarStatus.textContent = data.message || 'Memproses pencarian...';
+        } else {
+          scrapeRadar.style.display = 'none';
+          btnStartScrape.disabled = false;
+        }
       }
       if (data.type === 'lead') {
         activeLeads.push(data.lead);
         renderTable();
-        telemetryText.textContent = data.message;
-      }
-      if (data.type === 'status' && data.finished) {
-        telemetryText.textContent = `Selesai! Berhasil mengumpulkan ${activeLeads.length} leads.`;
-        btnStartScrape.disabled = false;
+        radarStatus.textContent = data.message;
+        radarCounter.textContent = `${data.progress || 0}%`;
       }
     } catch {}
   };
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
   checkHealth();
   fetchLicense();
   connectSSE();
@@ -146,8 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const query = (inputQuery.value || '').trim();
     if (!query) return alert('Masukkan kata kunci pencarian');
     btnStartScrape.disabled = true;
-    telemetryBox.style.display = 'block';
-    telemetryText.textContent = `Memulai pencarian untuk: ${query}...`;
+    scrapeRadar.style.display = 'flex';
+    radarStatus.textContent = `Mencari profil Instagram untuk: ${query}...`;
+    radarCounter.textContent = '0%';
     try {
       const res = await fetch('/api/scrape/start', {
         method: 'POST',
@@ -157,10 +237,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) {
         const err = await res.json();
         alert(err.error || 'Gagal memulai scraping');
+        scrapeRadar.style.display = 'none';
         btnStartScrape.disabled = false;
       }
     } catch {
       btnStartScrape.disabled = false;
+      scrapeRadar.style.display = 'none';
     }
   });
 
@@ -183,29 +265,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (btnContinueTrial) {
-    btnContinueTrial.addEventListener('click', async () => {
-      await fetch('/api/license/onboard', { method: 'POST', body: '{}' });
-      fetchLicense();
-    });
-  }
+  if (licensePill) licensePill.addEventListener('click', () => { licenseModal.hidden = false; loadPaymentPlans(); });
+  if (btnContinueTrial) btnContinueTrial.addEventListener('click', async () => { await fetch('/api/license/onboard', { method: 'POST', body: '{}' }); fetchLicense(); });
 
   if (btnActivateLicense) {
     btnActivateLicense.addEventListener('click', async () => {
       const serial = (licenseSerialInput.value || '').trim();
       if (!serial) return alert('Isi kode aktivasi');
-      const res = await fetch('/api/license/activate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serial })
-      });
-      const d = await res.json();
-      if (res.ok) {
-        alert('Lisensi berhasil diaktifkan!');
-        fetchLicense();
-      } else {
-        alert(d.error || 'Aktivasi gagal');
-      }
+      const res = await fetch('/api/license/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial }) });
+      if (res.ok) { alert('Lisensi aktif!'); fetchLicense(); }
+      else alert('Kode aktivasi tidak valid');
     });
   }
 
