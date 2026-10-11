@@ -3,9 +3,9 @@
   # Insta Scraper Studio
   ### Instagram Business Intelligence, Engagement & Leads Analytics Desktop Suite
 
-  [![Release](https://img.shields.io/github/v/release/99apps-id/instagram-scaper-studio?color=e11d48&label=Release&logo=github)](https://github.com/99apps-id/instagram-scaper-studio/releases/latest)
-  [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-emerald?logo=electron)](https://github.com/99apps-id/instagram-scaper-studio/releases/latest)
-  [![License](https://img.shields.io/badge/License-Commercial%20%2F%20Trial-amber)](https://github.com/99apps-id/instagram-scaper-studio)
+  [![Release](https://img.shields.io/github/v/release/99apps-id/instagram-scraper-studio?color=e11d48&label=Release&logo=github)](https://github.com/99apps-id/instagram-scraper-studio/releases/latest)
+  [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-emerald?logo=electron)](https://github.com/99apps-id/instagram-scraper-studio/releases/latest)
+  [![License](https://img.shields.io/badge/License-Commercial%20%2F%20Trial-amber)](https://github.com/99apps-id/instagram-scraper-studio)
   [![Singapay](https://img.shields.io/badge/Payment-Singapay%20QRIS-blue)](https://singapay.id)
 
   <p align="center">
@@ -36,7 +36,7 @@
 
 Installer resmi versi **v0.1.0** untuk Windows siap diunduh:
 
-👉 **[Download Insta Scraper Studio Setup 0.1.0.exe](https://github.com/99apps-id/instagram-scaper-studio/releases/latest)**
+👉 **[Download Insta Scraper Studio Setup 0.1.0.exe](https://github.com/99apps-id/instagram-scraper-studio/releases/latest)**
 
 ---
 
@@ -53,8 +53,8 @@ Aplikasi ini dilengkapi masa percobaan gratis (**Trial 3 Hari**):
 ## 🚀 Cara Menjalankan (Development)
 
 ```bash
-git clone https://github.com/99apps-id/instagram-scaper-studio.git
-cd instagram-scaper-studio
+git clone https://github.com/99apps-id/instagram-scraper-studio.git
+cd instagram-scraper-studio
 npm install
 npm run dashboard   # Menjalankan web dashboard lokal
 npm run electron    # Menjalankan desktop app
@@ -66,3 +66,4 @@ npm run electron    # Menjalankan desktop app
   <p>Dikembangkan oleh <b><a href="https://99apps.id">99apps.id</a></b> • Hak Cipta dilindungi</p>
   <p>Dukungan teknis: <b>support@99apps.id</b></p>
 </div>
+
