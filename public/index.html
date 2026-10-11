@@ -4,50 +4,52 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Insta Scraper Studio — Instagram Intelligence & Leads Analytics</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="alternate icon" href="/favicon.png">
+  <link rel="icon" type="image/png" href="/insta-scraper-studio.png">
+  <link rel="apple-touch-icon" href="/insta-scraper-studio.png">
   <link rel="stylesheet" href="/styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Chart.js bundled locally for offline Electron support -->
+  <script src="/chart.umd.min.js"></script>
 </head>
 <body>
 
-  <!-- TITLEBAR -->
+  <!-- CUSTOM TITLEBAR (Electron frameless) -->
   <div class="titlebar" id="appTitlebar" hidden>
     <div class="titlebar-drag">
-      <span class="titlebar-dot"></span>
+      <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" class="titlebar-logo" style="width: 18px; height: 18px; border-radius: 4px; object-fit: cover;">
       <span class="titlebar-text">Insta Scraper Studio</span>
       <span class="titlebar-license" id="titlebarLicense">Trial</span>
     </div>
     <div class="titlebar-controls">
-      <button class="titlebar-btn" id="winMinimize">－</button>
-      <button class="titlebar-btn" id="winMaximize">□</button>
-      <button class="titlebar-btn titlebar-close" id="winClose">✕</button>
+      <button class="titlebar-btn" id="winMinimize" aria-label="Minimize">－</button>
+      <button class="titlebar-btn" id="winMaximize" aria-label="Maximize">□</button>
+      <button class="titlebar-btn titlebar-close" id="winClose" aria-label="Close">✕</button>
     </div>
   </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
   <!-- NAVBAR -->
   <header class="navbar">
     <div class="nav-brand">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <img src="/favicon.svg" alt="Insta Scraper Logo" width="30" height="30" style="border-radius: 8px;">
-        <div>
-          <h1>Insta Scraper Studio</h1>
-          <p>Instagram Business Intelligence, Engagement & Leads Analytics</p>
-        </div>
+      <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" class="brand-logo" style="width: 36px; height: 36px; border-radius: 8px; object-fit: cover;">
+      <div>
+        <h1>Insta Scraper Studio</h1>
+        <p>Instagram Business Intelligence, Engagement & Leads Analytics</p>
       </div>
     </div>
     <div class="nav-actions">
-      <button class="btn btn-surface btn-sm" id="btnConnectIG">
-        <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #e11d48; display: inline-block;"></span>
-        <span id="sessionStatusText">Hubungkan Instagram</span>
+      <button class="btn btn-surface btn-sm" id="btnConnectIG" aria-label="Hubungkan akun Instagram">
+        <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #a8a29e; display: inline-block;"></span>
+        <span id="sessionStatusText">Hubungkan Akun IG</span>
       </button>
 
-      <button class="license-pill" id="licensePill">
+      <button class="license-pill" id="licensePill" aria-label="Status lisensi - klik untuk detail">
         <span class="license-dot" id="licenseDot"></span>
         <span id="licensePillText">Memeriksa lisensi…</span>
       </button>
 
-      <a class="btn btn-emerald btn-sm" href="/api/export" id="btnExport">
+      <a class="btn btn-emerald btn-sm" href="/api/export" id="btnExport" aria-label="Unduh Excel">
         <span>Unduh Excel (.xlsx)</span>
       </a>
     </div>
@@ -55,47 +57,26 @@
 
   <div class="app-container">
 
-    <!-- ALERT BANNER: JIKA BELUM HUBUNGKAN INSTAGRAM -->
-    <div id="sessionAlertBanner" style="display: none; align-items: center; justify-content: space-between; background: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span style="font-size: 1.2rem;">⚠️</span>
-        <div>
-          <div style="font-size: 0.8rem; font-weight: 700; color: #9f1239;">Akun Instagram Belum Terhubung</div>
-          <div style="font-size: 0.72rem; color: #be123c;">Hubungkan akun Instagram Anda sekali untuk mengekstrak kontak lengkap (WhatsApp, Email & Engagement) dan menghindari batasan limit rate. Sesi login akan disimpan secara permanen.</div>
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm" id="btnBannerConnect" style="background: #e11d48; border-color: #be123c; white-space: nowrap;">
-        Hubungkan Sekarang
-      </button>
-    </div>
-
     <!-- QUERY HERO -->
     <div class="query-card">
-      <input type="text" id="inputQuery" class="query-input" placeholder="Masukkan kata kunci atau hashtag target (cth: kuliner jogja, skincare jakarta, cafe bandung)...">
-      <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; font-weight: 600; color: var(--ink-secondary); cursor: pointer; user-select: none;">
-        <input type="checkbox" id="checkDeepScan" style="accent-color: var(--accent-rose); width: 15px; height: 15px;">
-        <span>Deep Matrix Scan</span>
-      </label>
-      <button class="btn btn-primary" id="btnStartScrape">
+      <input type="text" id="inputQuery" class="query-input" placeholder="Masukkan kata kunci atau hashtag target (cth: kuliner jogja, skincare jakarta, cafe bandung)..." aria-label="Kata kunci pencarian">
+      <button class="btn btn-primary" id="btnStartScrape" aria-label="Mulai analisa">
         <span>Mulai Analisa</span>
-      </button>
-      <button class="btn btn-surface btn-sm" id="btnStopScrape" style="display: none; color: #be123c;">
-        <span>Stop</span>
       </button>
     </div>
 
-    <!-- RADAR PULSE ANIMATION SAAT SCRAPING AKTIF -->
-    <div class="scrape-radar" id="scrapeRadar">
-      <div class="radar-pulse-ring"></div>
+    <!-- SCRAPING PROGRESS RADAR -->
+    <div class="scrape-radar" id="scrapeRadar" role="status" aria-live="polite" hidden>
+      <div class="radar-pulse-ring" aria-hidden="true"></div>
       <div style="flex: 1;">
-        <div style="font-size: 0.78rem; font-weight: 700; color: #9f1239;" id="radarTitle">Menggali Intelijen Instagram...</div>
-        <div style="font-size: 0.7rem; color: #be123c;" id="radarStatus">Menghubungkan ke API profil publik...</div>
+        <div style="font-size: 0.78rem; font-weight: 700; color: #9f1239;" id="radarTitle">Menggali Intelijen Instagram…</div>
+        <div style="font-size: 0.7rem; color: #be123c;" id="radarStatus">Menghubungkan ke API profil publik…</div>
       </div>
       <div style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #be123c;" id="radarCounter">0%</div>
     </div>
 
     <!-- KPI STATS -->
-    <div class="kpi-grid">
+    <div class="kpi-grid" role="region" aria-label="Statistik utama">
       <div class="kpi-box">
         <div class="kpi-label">Total Leads Teranalisa</div>
         <div class="kpi-val" id="kpiTotal">0</div>
@@ -119,14 +100,14 @@
     </div>
 
     <!-- CHARTS ROW -->
-    <div class="analytics-grid">
+    <div class="analytics-grid" role="region" aria-label="Visualisasi data">
       <div class="chart-box">
         <div class="chart-title">
           <span>Distribusi Followers vs Engagement Rate (%)</span>
           <span style="font-size: 0.68rem; font-family: var(--font-sans); color: var(--ink-muted); font-weight: 500;">Metrik Interaksi Nyata</span>
         </div>
         <div style="height: 180px; position: relative;">
-          <canvas id="chartEngagement"></canvas>
+          <canvas id="chartEngagement" aria-label="Chart engagement rate per akun"></canvas>
         </div>
       </div>
       <div class="chart-box">
@@ -135,13 +116,13 @@
           <span style="font-size: 0.68rem; font-family: var(--font-sans); color: var(--ink-muted); font-weight: 500;">Frekuensi Tagar</span>
         </div>
         <div style="height: 180px; position: relative;">
-          <canvas id="chartHashtags"></canvas>
+          <canvas id="chartHashtags" aria-label="Chart distribusi hashtag"></canvas>
         </div>
       </div>
     </div>
 
     <!-- DATA TABLE -->
-    <div class="table-wrap">
+    <div class="table-wrap" role="region" aria-label="Tabel leads">
       <table class="leads-table">
         <thead>
           <tr>
@@ -164,22 +145,50 @@
 
   </div>
 
-  <!-- LICENSE MODAL -->
-  <div class="license-backdrop" id="licenseModal" hidden>
-    <div class="license-card">
-      <h2>Aktivasi Insta Scraper Studio</h2>
-      <p class="license-desc">Pilih paket langganan via QRIS Singapay atau masukkan kode aktivasi yang telah Anda miliki.</p>
-
-      <div class="license-plans-grid" id="licensePlansGrid"></div>
-
-      <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--ink-muted); margin-bottom: 0.35rem;">Kode Aktivasi</div>
-      <input type="text" id="licenseSerialInput" style="width: 100%; padding: 0.55rem; font-family: var(--font-mono); border: 1px solid var(--border-subtle); border-radius: 4px; margin-bottom: 0.75rem;" placeholder="GMST-XXXX-XXXXXX" spellcheck="false">
-      <button class="btn btn-primary" id="btnActivateLicense" style="width: 100%; justify-content: center; margin-bottom: 0.5rem;">Aktivasi Sekarang</button>
-      <button class="btn btn-surface btn-sm" id="btnContinueTrial" style="width: 100%; justify-content: center;">Lanjutkan Percobaan 3 Hari</button>
+  <!-- LICENSE DRAWER (Slide-over) -->
+  <div class="drawer-backdrop" id="licenseDrawerBackdrop" aria-hidden="true"></div>
+  <aside class="drawer" id="licenseDrawer" role="dialog" aria-modal="true" aria-labelledby="licenseDrawerTitle" hidden>
+    <div class="drawer-header">
+      <h2 id="licenseDrawerTitle">Aktivasi Insta Scraper Studio</h2>
+      <button class="drawer-close" id="licenseDrawerClose" aria-label="Tutup">✕</button>
     </div>
-  </div>
+    <div class="drawer-content">
+      <p style="font-size: 0.8rem; color: var(--ink-muted); margin-bottom: 1.25rem;">
+        Pilih paket langganan via QRIS Singapay atau masukkan kode aktivasi yang telah Anda miliki.
+      </p>
+
+      <!-- Payment Plans -->
+      <div class="drawer-section">
+        <div class="drawer-section-title">Pilih Paket (QRIS Singapay)</div>
+        <div id="licensePlansContainer"></div>
+      </div>
+
+      <!-- Divider -->
+      <div class="drawer-divider">Atau</div>
+
+      <!-- Manual Activation -->
+      <div class="drawer-section">
+        <div class="drawer-section-title">Kode Aktivasi</div>
+        <input type="text" id="licenseSerialInput" class="drawer-input" placeholder="GMST-YYMM-XXXXXX" spellcheck="false" autocomplete="off" aria-label="Kode aktivasi">
+        <div class="drawer-btn-row">
+          <button class="btn btn-primary" id="btnActivateLicense" style="flex: 1;">Aktivasi Sekarang</button>
+          <button class="btn btn-surface" id="btnContinueTrial" style="flex: 1;">Lanjutkan Trial 3 Hari</button>
+        </div>
+        <div id="licenseError" style="font-size: 0.75rem; color: var(--accent-rose); margin-top: 0.5rem; min-height: 1.2rem; display: none;"></div>
+      </div>
+
+      <!-- Deactivate (shown when activated) -->
+      <div class="drawer-section" id="deactivateSection" style="display: none;">
+        <button class="btn btn-surface" id="btnDeactivateLicense" style="width: 100%; color: var(--accent-rose);">Nonaktifkan Lisensi di Perangkat Ini</button>
+        <p style="font-size: 0.7rem; color: var(--ink-muted); margin-top: 0.5rem;">Kode aktivasi dapat dipakai ulang di perangkat lain setelah dinonaktifkan.</p>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <span>ID Instalasi: <code id="drawerInstallId">-</code></span>
+      <button class="btn btn-surface btn-sm" id="btnCopyInstallId">Salin</button>
+    </div>
+  </aside>
 
   <script src="/app.js"></script>
 </body>
 </html>
-

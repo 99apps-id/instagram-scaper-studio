@@ -17,7 +17,8 @@ const PORT = process.env.PORT || (app.isPackaged ? 3108 : 3001);
 const APP_TOKEN = crypto.randomBytes(16).toString('hex');
 const SERVER_URL = `http://127.0.0.1:${PORT}`;
 const ROOT_DIR = path.join(__dirname, '..');
-const ICON_PNG = path.join(__dirname, 'assets', 'icon.png');
+// Use the new logo as app icon
+const ICON_PNG = path.join(ROOT_DIR, 'public', 'insta-scraper-studio.png');
 
 let mainWindow = null;
 let serverProc = null;
