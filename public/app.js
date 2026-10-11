@@ -2,6 +2,7 @@
 let licenseState = null;
 let chartEngagement = null;
 let chartHashtags = null;
+let hasInstagramSession = false;
 
 const tableBody = document.getElementById('tableBody');
 const btnStartScrape = document.getElementById('btnStartScrape');
@@ -9,6 +10,9 @@ const inputQuery = document.getElementById('inputQuery');
 const btnConnectIG = document.getElementById('btnConnectIG');
 const sessionStatusDot = document.getElementById('sessionStatusDot');
 const sessionStatusText = document.getElementById('sessionStatusText');
+
+const sessionAlertBanner = document.getElementById('sessionAlertBanner');
+const btnBannerConnect = document.getElementById('btnBannerConnect');
 
 const scrapeRadar = document.getElementById('scrapeRadar');
 const radarStatus = document.getElementById('radarStatus');
@@ -26,12 +30,18 @@ async function checkHealth() {
   try {
     const res = await fetch('/api/health');
     const data = await res.json();
-    if (data.hasSession) {
+    hasInstagramSession = Boolean(data.hasSession);
+
+    if (hasInstagramSession) {
       sessionStatusDot.style.background = '#047857';
-      sessionStatusText.textContent = 'Akun IG Terhubung';
+      sessionStatusText.textContent = 'Instagram Terhubung';
+      if (sessionAlertBanner) sessionAlertBanner.style.display = 'none';
+      if (btnConnectIG) btnConnectIG.title = 'Sesi Instagram aktif dan tersimpan';
     } else {
-      sessionStatusDot.style.background = '#a8a29e';
-      sessionStatusText.textContent = 'Hubungkan Akun IG';
+      sessionStatusDot.style.background = '#e11d48';
+      sessionStatusText.textContent = 'Hubungkan Instagram';
+      if (sessionAlertBanner) sessionAlertBanner.style.display = 'flex';
+      if (btnConnectIG) btnConnectIG.title = 'Klik untuk menghubungkan sesi akun Instagram Anda';
     }
   } catch {}
 }
@@ -140,13 +150,11 @@ function initCharts() {
 function updateCharts() {
   if (!chartEngagement || !chartHashtags) return;
 
-  // 6 Akun teratas berdasarkan followers
   const topAccounts = [...activeLeads].sort((a, b) => (b.followerCount || 0) - (a.followerCount || 0)).slice(0, 6);
   chartEngagement.data.labels = topAccounts.map(a => `@${a.username}`);
   chartEngagement.data.datasets[0].data = topAccounts.map(a => a.engagementRate || 0);
   chartEngagement.update();
 
-  // Akumulasi Hashtag
   const tagCounts = {};
   activeLeads.forEach(l => {
     (l.topHashtags || []).forEach(t => {
@@ -215,6 +223,23 @@ function connectSSE() {
   };
 }
 
+async function triggerConnectInstagram() {
+  if (window.electronAPI && window.electronAPI.connectInstagram) {
+    const res = await window.electronAPI.connectInstagram();
+    if (res.success && res.session) {
+      await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(res.session)
+      });
+      checkHealth();
+      alert('Akun Instagram berhasil terhubung! Sesi login Anda telah tersimpan secara permanen.');
+    }
+  } else {
+    alert('Buka aplikasi desktop Insta Scraper Studio untuk menghubungkan akun Instagram Anda secara instan.');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   checkHealth();
@@ -222,6 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
   connectSSE();
 
   btnStartScrape.addEventListener('click', async () => {
+    if (!hasInstagramSession) {
+      alert('Perhatian: Anda belum menghubungkan akun Instagram!\n\nUntuk menghindari limit rate dan mendapatkan data lengkap (WhatsApp, Email & Engagement), silakan klik tombol "Hubungkan Akun IG" terlebih dahulu.');
+      triggerConnectInstagram();
+      return;
+    }
+
     const query = (inputQuery.value || '').trim();
     if (!query) return alert('Masukkan kata kunci pencarian');
     btnStartScrape.disabled = true;
@@ -247,22 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   if (btnConnectIG) {
-    btnConnectIG.addEventListener('click', async () => {
-      if (window.electronAPI && window.electronAPI.connectInstagram) {
-        const res = await window.electronAPI.connectInstagram();
-        if (res.success && res.session) {
-          await fetch('/api/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(res.session)
-          });
-          checkHealth();
-          alert('Akun Instagram berhasil terhubung!');
-        }
-      } else {
-        alert('Fitur login Instagram instan aktif pada aplikasi Desktop Electron.');
-      }
-    });
+    btnConnectIG.addEventListener('click', triggerConnectInstagram);
+  }
+
+  if (btnBannerConnect) {
+    btnBannerConnect.addEventListener('click', triggerConnectInstagram);
   }
 
   if (licensePill) licensePill.addEventListener('click', () => { licenseModal.hidden = false; loadPaymentPlans(); });

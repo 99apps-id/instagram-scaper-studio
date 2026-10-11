@@ -1,4 +1,12 @@
-﻿const { app, BrowserWindow, Menu, ipcMain, dialog, shell, session } = require('electron');
+﻿/**
+ * Insta Scraper Studio — Electron Main (Windows)
+ * Frameless (frame:false), custom titlebar, no native menu.
+ * Server (server.js) runs as child process with ELECTRON_RUN_AS_NODE
+ * so single Electron binary runs both UI and API, dev and packaged.
+ * Integrity check, single instance, custom port, logging.
+ */
+
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -14,9 +22,12 @@ const ICON_PNG = path.join(__dirname, 'assets', 'icon.png');
 let mainWindow = null;
 let serverProc = null;
 
+// Sesi dan lisensi tersimpan di folder userData agar persisten & tidak hilang saat app di-exit
+let userDataPath = path.join(ROOT_DIR, 'data');
 try {
-  const userData = app.getPath('userData');
-  process.env.LICENSE_FILE = path.join(userData, 'license.json');
+  userDataPath = app.getPath('userData');
+  process.env.LICENSE_FILE = path.join(userDataPath, 'license.json');
+  process.env.INSTA_SESSION_FILE = path.join(userDataPath, 'instagram_session.json');
 } catch {}
 
 function waitForServer(timeoutMs = 45000) {
@@ -38,8 +49,10 @@ function waitForServer(timeoutMs = 45000) {
       req.on('error', retry);
       req.on('timeout', () => { req.destroy(); retry(); });
       function retry() {
-        if (serverProc && serverProc.exitCode !== null) return reject(new Error('Server berhenti'));
-        if (Date.now() - start > timeoutMs) return reject(new Error('Server timeout'));
+        if (serverProc && serverProc.exitCode !== null) {
+          return reject(new Error('Server process exited unexpectedly.'));
+        }
+        if (Date.now() - start > timeoutMs) return reject(new Error('Server startup timeout.'));
         setTimeout(tick, 800);
       }
     };
@@ -50,16 +63,25 @@ function waitForServer(timeoutMs = 45000) {
 function startServer() {
   return new Promise((resolve, reject) => {
     const serverJs = path.join(ROOT_DIR, 'server.js');
-    if (!fs.existsSync(serverJs)) return reject(new Error('server.js tidak ditemukan'));
+    if (!fs.existsSync(serverJs)) return reject(new Error('server.js not found.'));
+
+    let logStream = null;
+    try {
+      fs.mkdirSync(userDataPath, { recursive: true });
+      logStream = fs.openSync(path.join(userDataPath, 'server.log'), 'a');
+    } catch {}
+
     serverProc = spawn(process.execPath, [serverJs], {
       env: {
         ...process.env,
         PORT: String(PORT),
-        GMST_TOKEN: APP_TOKEN,
-        ELECTRON_RUN_AS_NODE: '1'
+        INSTA_TOKEN: APP_TOKEN,
+        INSTA_SESSION_FILE: path.join(userDataPath, 'instagram_session.json'),
+        LICENSE_FILE: path.join(userDataPath, 'license.json'),
+        ELECTRON_RUN_AS_NODE: '1',
       },
-      stdio: 'ignore',
-      windowsHide: true
+      stdio: logStream ? ['ignore', logStream, logStream] : 'ignore',
+      windowsHide: true,
     });
     serverProc.on('error', reject);
     waitForServer().then(resolve).catch(reject);
@@ -74,13 +96,18 @@ function createWindow() {
     minHeight: 640,
     frame: false,
     autoHideMenuBar: true,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#fafaf9',
     icon: fs.existsSync(ICON_PNG) ? ICON_PNG : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   mainWindow.loadURL(SERVER_URL);
@@ -102,22 +129,25 @@ ipcMain.handle('open-external', async (_evt, url) => {
       await shell.openExternal(url);
       return { success: true };
     }
-    return { success: false, error: 'URL tidak valid' };
+    return { success: false, error: 'Invalid URL' };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
 
-// POPUP LOGIN INSTAGRAM & AMBIL COOKIE SESI OTOMATIS
+// Instagram login popup & auto cookie capture (Menggunakan persist session partition)
 ipcMain.handle('connect-instagram', async () => {
   return new Promise((resolve) => {
     const authWindow = new BrowserWindow({
-      width: 480,
-      height: 680,
-      title: 'Login Instagram',
+      width: 500,
+      height: 700,
+      title: 'Login Akun Instagram Resmi',
       parent: mainWindow,
       modal: true,
-      autoHideMenuBar: true
+      autoHideMenuBar: true,
+      webPreferences: {
+        partition: 'persist:instagram_session'
+      }
     });
 
     authWindow.loadURL('https://www.instagram.com/accounts/login/');
@@ -147,7 +177,7 @@ app.whenReady().then(async () => {
   try {
     await startServer();
   } catch (err) {
-    dialog.showErrorBox('Gagal memulai server', err.message);
+    dialog.showErrorBox('Insta Scraper Studio gagal dijalankan', `Server lokal error:\n${err.message}`);
     app.quit();
     return;
   }
@@ -163,3 +193,20 @@ app.on('window-all-closed', () => {
   }
   if (process.platform !== 'darwin') app.quit();
 });
+
+app.on('before-quit', () => {
+  if (serverProc && serverProc.exitCode === null) {
+    try { serverProc.kill(); } catch {}
+  }
+});
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}

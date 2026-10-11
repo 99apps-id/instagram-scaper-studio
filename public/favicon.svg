@@ -1,7 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
-  <path d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8z" fill="#EA4335"/>
-  <path d="M12 2c4.42 0 8 3.58 8 8 0 2.87-1.72 6.14-3.78 8.91L12 22V2z" fill="#FBBC04"/>
-  <path d="M12 22l-4.22-3.09C9.07 17.18 10.51 15.11 11.45 13.5L12 22z" fill="#34A853"/>
-  <path d="M4 10c0 3.5 3.5 8 8 12v-7.5C9.51 14.5 7.5 12.49 7.5 10c0-1.06.37-2.03 1-2.8L5.8 4.5C4.68 6 4 7.9 4 10z" fill="#4285F4"/>
-  <circle cx="12" cy="10" r="3.5" fill="#FFFFFF"/>
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="64" height="64">
+  <defs>
+    <linearGradient id="instaGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="35%" stop-color="#e11d48" />
+      <stop offset="70%" stop-color="#c026d3" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="128" fill="url(#instaGrad)" />
+  <rect x="120" y="120" width="272" height="272" rx="72" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" />
+  <circle cx="256" cy="256" r="64" fill="none" stroke="#ffffff" stroke-width="26" />
+  <circle cx="338" cy="174" r="15" fill="#ffffff" />
 </svg>

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Insta Scraper Studio — Instagram Intelligence & Leads Analytics</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="alternate icon" href="/favicon.png">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -27,15 +28,18 @@
   <!-- NAVBAR -->
   <header class="navbar">
     <div class="nav-brand">
-      <div>
-        <h1>Insta Scraper Studio</h1>
-        <p>Instagram Business Intelligence, Engagement & Leads Analytics</p>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <img src="/favicon.svg" alt="Insta Scraper Logo" width="30" height="30" style="border-radius: 8px;">
+        <div>
+          <h1>Insta Scraper Studio</h1>
+          <p>Instagram Business Intelligence, Engagement & Leads Analytics</p>
+        </div>
       </div>
     </div>
     <div class="nav-actions">
       <button class="btn btn-surface btn-sm" id="btnConnectIG">
-        <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #a8a29e; display: inline-block;"></span>
-        <span id="sessionStatusText">Hubungkan Akun IG</span>
+        <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #e11d48; display: inline-block;"></span>
+        <span id="sessionStatusText">Hubungkan Instagram</span>
       </button>
 
       <button class="license-pill" id="licensePill">
@@ -50,6 +54,20 @@
   </header>
 
   <div class="app-container">
+
+    <!-- ALERT BANNER: JIKA BELUM HUBUNGKAN INSTAGRAM -->
+    <div id="sessionAlertBanner" style="display: none; align-items: center; justify-content: space-between; background: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 1.2rem;">⚠️</span>
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; color: #9f1239;">Akun Instagram Belum Terhubung</div>
+          <div style="font-size: 0.72rem; color: #be123c;">Hubungkan akun Instagram Anda sekali untuk mengekstrak kontak lengkap (WhatsApp, Email & Engagement) dan menghindari batasan limit rate. Sesi login akan disimpan secara permanen.</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btnBannerConnect" style="background: #e11d48; border-color: #be123c; white-space: nowrap;">
+        Hubungkan Sekarang
+      </button>
+    </div>
 
     <!-- QUERY HERO -->
     <div class="query-card">
