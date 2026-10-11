@@ -16,7 +16,8 @@
   },
   "devDependencies": {
     "electron": "^34.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "sharp": "^0.35.5"
   },
   "build": {
     "appId": "id.naracitra.insta-scraper",
@@ -38,7 +39,9 @@
     ],
     "win": {
       "icon": "electron/assets/icon.ico",
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,
