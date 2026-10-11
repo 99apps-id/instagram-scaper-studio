@@ -20,9 +20,9 @@
   --accent-amber: #b45309;  /* Amber 700 */
   --accent-amber-subtle: #fffbeb;
 
-  --font-serif: "Iowan Old Style", "Apple Garamond", "Baskerville", "Times New Roman", "Droid Serif", Times, Source Serif Pro, serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Georgia", "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   --radius-xs: 3px;
   --radius-sm: 6px;
@@ -131,6 +131,52 @@ body {
 .license-dot.ok { background: var(--accent-emerald); }
 .license-dot.warn { background: var(--accent-amber); }
 .license-dot.bad { background: var(--accent-rose); }
+
+/* Settings Dropdown */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 0.4rem 0;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: all 0.2s ease;
+}
+.dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  transition: all 0.1s ease;
+}
+.dropdown-item:hover {
+  background: var(--bg-subtle);
+  color: var(--ink-primary);
+}
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-hairline);
+  margin: 0.4rem 0;
+}
 
 /* Layout Container */
 .app-container {

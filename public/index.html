@@ -6,6 +6,10 @@
   <title>Insta Scraper Studio — Instagram Intelligence & Leads Analytics</title>
   <link rel="icon" type="image/png" href="/insta-scraper-studio.png">
   <link rel="apple-touch-icon" href="/insta-scraper-studio.png">
+  <!-- Professional Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/styles.css">
   <!-- Chart.js bundled locally for offline Electron support -->
   <script src="/chart.umd.min.js"></script>
@@ -48,6 +52,23 @@
         <span class="license-dot" id="licenseDot"></span>
         <span id="licensePillText">Memeriksa lisensi…</span>
       </button>
+
+      <!-- Settings Dropdown -->
+      <div class="dropdown-container" id="settingsDropdown">
+        <button class="btn btn-surface btn-sm" id="btnSettingsMenu" aria-label="Pengaturan" aria-haspopup="true" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <div class="dropdown-menu" id="settingsMenu" role="menu" hidden>
+          <a class="dropdown-item" href="#" id="menuLicense" role="menuitem">Lisensi</a>
+          <a class="dropdown-item" href="#" id="menuFAQ" role="menuitem">FAQ</a>
+          <a class="dropdown-item" href="#" id="menuAbout" role="menuitem">Tentang</a>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="#" id="menuExit" role="menuitem" style="color: var(--accent-rose);">Keluar</a>
+        </div>
+      </div>
 
       <a class="btn btn-emerald btn-sm" href="/api/export" id="btnExport" aria-label="Unduh Excel">
         <span>Unduh Excel (.xlsx)</span>
@@ -191,6 +212,71 @@
       <button class="btn btn-surface btn-sm" id="btnCopyInstallId">Salin</button>
     </div>
   </aside>
+
+  <!-- FAQ MODAL -->
+  <div class="license-backdrop" id="faqModal" hidden>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="faqTitle" style="max-width: 560px;">
+      <div class="drawer-header">
+        <h2 id="faqTitle">Pertanyaan Umum (FAQ)</h2>
+        <button class="drawer-close" id="faqClose" aria-label="Tutup">✕</button>
+      </div>
+      <div class="drawer-content">
+        <details class="faq-item">
+          <summary>Bagaimana cara mengaktifkan lisensi?</summary>
+          <p>Buka menu <strong>Pengaturan → Lisensi</strong>, pilih paket QRIS Singapay atau masukkan kode aktivasi manual, lalu klik <strong>Aktivasi Sekarang</strong>.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Apakah saya harus menghubungkan akun Instagram?</summary>
+          <p>Tidak wajib, tetapi sangat disarankan. Menghubungkan akun menghindari rate limit dan memungkinkan akses ke data lengkap (WhatsApp, Email, Engagement Rate). Klik tombol <strong>Hubungkan Akun IG</strong> di toolbar.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Berapa lama masa trial gratis?</summary>
+          <p>3 hari penuh sejak aplikasi pertama kali dibuka. Setelah masa trial habis, scraping dan export Excel diblokir hingga lisensi diaktifkan.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Data saya disimpan di mana?</summary>
+          <p>Semua data scraping dan sesi disimpan <strong>lokal di perangkat Anda</strong> (folder <code>%APPDATA%/Insta Scraper Studio</code>). Tidak ada data yang dikirim ke server eksternal.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Bagaimana cara memindahkan lisensi ke komputer lain?</summary>
+          <p>Buka menu <strong>Pengaturan → Lisensi → Nonaktifkan Lisensi</strong> di komputer lama, lalu masukkan kode aktivasi yang sama di komputer baru.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Apakah aplikasi ini aman?</summary>
+          <p>Ya. Aplikasi tidak mengirim data pribadi ke server mana pun. Scraping dilakukan melalui API publik Instagram. Integritas aplikasi diverifikasi saat startup.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT MODAL -->
+  <div class="license-backdrop" id="aboutModal" hidden>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" style="max-width: 480px;">
+      <div class="drawer-header">
+        <h2 id="aboutTitle">Tentang Insta Scraper Studio</h2>
+        <button class="drawer-close" id="aboutClose" aria-label="Tutup">✕</button>
+      </div>
+      <div class="drawer-content">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" style="width: 80px; height: 80px; border-radius: 16px; object-fit: cover;">
+        </div>
+        <p style="text-align: center; color: var(--ink-secondary); margin-bottom: 1rem;">
+          <strong>Insta Scraper Studio</strong> v0.1.0<br>
+          Instagram Business Intelligence & Leads Analytics
+        </p>
+        <div style="font-size: 0.8rem; color: var(--ink-muted); line-height: 1.8;">
+          <div><strong>ID Instalasi:</strong> <code id="aboutInstallId">-</code></div>
+          <div><strong>Status Lisensi:</strong> <code id="aboutLicenseState">-</code></div>
+          <div><strong>Mode Engine:</strong> Local</div>
+          <div><strong>Dibangun dengan:</strong> Electron, Node.js, Chart.js</div>
+        </div>
+        <p style="margin-top: 1.25rem; font-size: 0.75rem; color: var(--ink-muted); text-align: center;">
+          © 2025 Naracitra. Hak cipta dilindungi.<br>
+          Dukungan: <a href="mailto:support@99apps.id" style="color: var(--accent-rose);">support@99apps.id</a>
+        </p>
+      </div>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

@@ -200,7 +200,7 @@ if (!app.requestSingleInstanceLock()) {
       } catch {}
     };
 
-    // Integrity tripwire check saat packaged
+    // Integrity tripwire check saat packaged (FAIL-OPEN: tidak disable engine kalau gagal)
     if (app.isPackaged) {
       try {
         const { checkIntegrity } = require('./integrity-check.cjs');
@@ -209,8 +209,7 @@ if (!app.requestSingleInstanceLock()) {
         const integrityUrl = process.env.INTEGRITY_URL || `${engineUrl}/integrity.json`;
         const res = await checkIntegrity({ asarPath, integrityUrl });
         if (res.checked && !res.ok) {
-          process.env.DISABLE_ENGINE = '1';
-          mainLog('integrity GAGAL (hash tak cocok) — engine dimatikan.');
+          mainLog('integrity GAGAL (hash tak cocok) — engine TETAP aktif (fail-open).');
         } else if (res.checked) {
           mainLog('integrity OK.');
         } else {
@@ -220,6 +219,9 @@ if (!app.requestSingleInstanceLock()) {
         mainLog(`integrity skipped (error: ${err.message}).`);
       }
     }
+
+    // Ensure DISABLE_ENGINE is not set (fail-open untuk trial user)
+    delete process.env.DISABLE_ENGINE;
 
     try {
       await startServer();

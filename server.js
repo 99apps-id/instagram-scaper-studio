@@ -8,6 +8,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import {
   getLicenseStatus,
@@ -348,7 +349,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const tmpPath = path.join(__dirname, `Insta_Leads_${Date.now()}.xlsx`);
+    const tmpPath = path.join(os.tmpdir(), `Insta_Leads_${Date.now()}.xlsx`);
     try {
       await exportInstagramLeadsToExcel(activeLeads, tmpPath);
       res.writeHead(200, {

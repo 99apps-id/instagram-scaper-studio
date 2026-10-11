@@ -23,10 +23,33 @@ const radarCounter = document.getElementById('radarCounter');
 const licensePill = document.getElementById('licensePill');
 const licenseDot = document.getElementById('licenseDot');
 const licensePillText = document.getElementById('licensePillText');
-const licenseModal = document.getElementById('licenseModal');
+const licenseDrawer = document.getElementById('licenseDrawer');
+const licenseDrawerBackdrop = document.getElementById('licenseDrawerBackdrop');
+const licenseDrawerClose = document.getElementById('licenseDrawerClose');
 const btnContinueTrial = document.getElementById('btnContinueTrial');
 const btnActivateLicense = document.getElementById('btnActivateLicense');
 const licenseSerialInput = document.getElementById('licenseSerialInput');
+const licenseError = document.getElementById('licenseError');
+const btnDeactivateLicense = document.getElementById('btnDeactivateLicense');
+const btnCopyInstallId = document.getElementById('btnCopyInstallId');
+const drawerInstallId = document.getElementById('drawerInstallId');
+const licensePlansContainer = document.getElementById('licensePlansContainer');
+
+// Settings Dropdown elements
+const btnSettingsMenu = document.getElementById('btnSettingsMenu');
+const settingsMenu = document.getElementById('settingsMenu');
+const menuLicense = document.getElementById('menuLicense');
+const menuFAQ = document.getElementById('menuFAQ');
+const menuAbout = document.getElementById('menuAbout');
+const menuExit = document.getElementById('menuExit');
+
+// FAQ & About Modals
+const faqModal = document.getElementById('faqModal');
+const aboutModal = document.getElementById('aboutModal');
+const faqClose = document.getElementById('faqClose');
+const aboutClose = document.getElementById('aboutClose');
+const aboutInstallId = document.getElementById('aboutInstallId');
+const aboutLicenseState = document.getElementById('aboutLicenseState');
 
 async function loadPersistedLeads() {
   try {
@@ -70,18 +93,67 @@ async function fetchLicense() {
 function renderLicense() {
   const lic = licenseState;
   if (!lic) return;
+  
+  // Update license pill
   licensePillText.textContent = lic.activated ? 'Aktif' : (lic.expired ? 'Trial Habis' : `Trial: ${lic.daysLeft} hari`);
   licenseDot.className = `license-dot ${lic.activated ? 'ok' : (lic.expired ? 'bad' : 'warn')}`;
-  if (!lic.onboarded || lic.blocked) {
-    licenseModal.hidden = false;
+  
+  // Update titlebar license
+  const titlebarLicense = document.getElementById('titlebarLicense');
+  if (titlebarLicense) titlebarLicense.textContent = licensePillText.textContent;
+  
+  // Determine drawer state and button behavior
+  const isTrialActive = !lic.expired && !lic.activated;
+  const isOnboarded = lic.onboarded;
+  const isBlocked = lic.blocked;
+  
+  // Show drawer if: not onboarded yet, OR trial expired/blocked
+  if (!isOnboarded || isBlocked) {
+    licenseDrawer.hidden = false;
+    licenseDrawer.classList.add('open');
+    licenseDrawerBackdrop.classList.add('open');
     loadPaymentPlans();
   } else {
-    licenseModal.hidden = true;
+    licenseDrawer.hidden = true;
+    licenseDrawer.classList.remove('open');
+    licenseDrawerBackdrop.classList.remove('open');
   }
+  
+  // Update trial button text and behavior
+  if (btnContinueTrial) {
+    if (isTrialActive && !isOnboarded) {
+      // Trial not started yet
+      btnContinueTrial.textContent = `Lanjutkan gratis ${lic.daysLeft} hari`;
+      btnContinueTrial.style.display = 'block';
+      btnContinueTrial.onclick = async () => {
+        await fetch('/api/license/onboard', { method: 'POST', body: '{}' });
+        fetchLicense();
+      };
+    } else if (isTrialActive && isOnboarded) {
+      // Trial active, already onboarded - don't show button in drawer (drawer is hidden)
+      btnContinueTrial.style.display = 'none';
+    } else {
+      // Trial expired or blocked
+      btnContinueTrial.textContent = 'Tutup';
+      btnContinueTrial.style.display = 'block';
+      btnContinueTrial.onclick = () => {
+        licenseDrawer.hidden = true;
+        licenseDrawer.classList.remove('open');
+        licenseDrawerBackdrop.classList.remove('open');
+      };
+    }
+  }
+  
+  // Update deactivate section visibility
+  if (btnDeactivateLicense) {
+    btnDeactivateLicense.style.display = lic.activated ? 'block' : 'none';
+  }
+  // Update install ID
+  if (drawerInstallId) drawerInstallId.textContent = lic.installId || '-';
 }
 
 async function loadPaymentPlans() {
-  const grid = document.getElementById('licensePlansGrid');
+  const grid = document.getElementById('licensePlansContainer');
   if (!grid) return;
   try {
     const res = await fetch('/api/payment/options');
@@ -260,6 +332,44 @@ async function triggerConnectInstagram() {
   }
 }
 
+// Toast notification system
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    pointer-events: auto;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--ink-primary);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: toast-in 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 280px;
+    max-width: 420px;
+  `;
+  
+  if (type === 'success') toast.style.background = 'var(--accent-emerald)';
+  else if (type === 'error') toast.style.background = 'var(--accent-rose)';
+  else if (type === 'warning') toast.style.background = 'var(--accent-amber)';
+  else toast.style.background = 'var(--ink-secondary)';
+  
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'toast-out 0.3s ease-in forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   checkHealth();
@@ -318,8 +428,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnConnectIG) btnConnectIG.addEventListener('click', triggerConnectInstagram);
   if (btnBannerConnect) btnBannerConnect.addEventListener('click', triggerConnectInstagram);
 
-  if (licensePill) licensePill.addEventListener('click', () => { licenseModal.hidden = false; loadPaymentPlans(); });
-  if (btnContinueTrial) btnContinueTrial.addEventListener('click', async () => { await fetch('/api/license/onboard', { method: 'POST', body: '{}' }); fetchLicense(); });
+  if (licensePill) licensePill.addEventListener('click', () => {
+    licenseDrawer.hidden = false;
+    licenseDrawer.classList.add('open');
+    licenseDrawerBackdrop.classList.add('open');
+    loadPaymentPlans();
+  });
 
   if (btnActivateLicense) {
     btnActivateLicense.addEventListener('click', async () => {
@@ -328,6 +442,95 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/license/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial }) });
       if (res.ok) { alert('Lisensi aktif!'); fetchLicense(); }
       else alert('Kode aktivasi tidak valid');
+    });
+  }
+
+  // Settings Dropdown
+  if (btnSettingsMenu && settingsMenu) {
+    btnSettingsMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = settingsMenu.classList.toggle('show');
+      btnSettingsMenu.setAttribute('aria-expanded', isOpen);
+    });
+    document.addEventListener('click', (e) => {
+      if (!settingsMenu.contains(e.target) && !btnSettingsMenu.contains(e.target)) {
+        settingsMenu.classList.remove('show');
+        btnSettingsMenu.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  // Settings Menu Items
+  if (menuLicense) menuLicense.addEventListener('click', (e) => {
+    e.preventDefault();
+    settingsMenu.classList.remove('show');
+    btnSettingsMenu.setAttribute('aria-expanded', 'false');
+    licenseDrawer.hidden = false;
+    licenseDrawer.classList.add('open');
+    licenseDrawerBackdrop.classList.add('open');
+    loadPaymentPlans();
+  });
+  if (menuFAQ) menuFAQ.addEventListener('click', (e) => {
+    e.preventDefault();
+    settingsMenu.classList.remove('show');
+    btnSettingsMenu.setAttribute('aria-expanded', 'false');
+    faqModal.hidden = false;
+  });
+  if (menuAbout) menuAbout.addEventListener('click', (e) => {
+    e.preventDefault();
+    settingsMenu.classList.remove('show');
+    btnSettingsMenu.setAttribute('aria-expanded', 'false');
+    if (aboutInstallId) aboutInstallId.textContent = licenseState?.installId || '-';
+    if (aboutLicenseState) aboutLicenseState.textContent = licenseState?.activated ? 'Aktif' : (licenseState?.expired ? 'Trial Habis' : `Trial ${licenseState?.daysLeft} hari`);
+    aboutModal.hidden = false;
+  });
+  if (menuExit) menuExit.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (window.electronAPI) {
+      window.electronAPI.windowControl('close');
+    } else {
+      window.close();
+    }
+  });
+
+  // FAQ Modal
+  if (faqClose) faqClose.addEventListener('click', () => { faqModal.hidden = true; });
+  if (faqModal) faqModal.addEventListener('click', (e) => { if (e.target === faqModal) faqModal.hidden = true; });
+
+  // About Modal
+  if (aboutClose) aboutClose.addEventListener('click', () => { aboutModal.hidden = true; });
+  if (aboutModal) aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) aboutModal.hidden = true; });
+
+  // License Drawer Close
+  if (licenseDrawerClose) licenseDrawerClose.addEventListener('click', () => {
+    licenseDrawer.hidden = true;
+    licenseDrawer.classList.remove('open');
+    licenseDrawerBackdrop.classList.remove('open');
+  });
+  if (licenseDrawerBackdrop) licenseDrawerBackdrop.addEventListener('click', () => {
+    licenseDrawer.hidden = true;
+    licenseDrawer.classList.remove('open');
+    licenseDrawerBackdrop.classList.remove('open');
+  });
+
+  // Copy Install ID
+  if (btnCopyInstallId) btnCopyInstallId.addEventListener('click', () => {
+    if (licenseState?.installId) {
+      navigator.clipboard.writeText(licenseState.installId);
+      showToast('ID Instalasi disalin!', 'success');
+    }
+  });
+
+  // Deactivate License
+  if (btnDeactivateLicense) {
+    btnDeactivateLicense.addEventListener('click', async () => {
+      if (!confirm('Nonaktifkan lisensi di perangkat ini? Kode aktivasi bisa dipakai di perangkat lain.')) return;
+      try {
+        const res = await fetch('/api/license/deactivate', { method: 'POST', body: '{}' });
+        const data = await res.json();
+        if (res.ok) { fetchLicense(); showToast('Lisensi dinonaktifkan.', 'success'); }
+        else showToast(data.error || 'Gagal menonaktifkan', 'error');
+      } catch { showToast('Error jaringan', 'error'); }
     });
   }
 
