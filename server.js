@@ -64,7 +64,7 @@ const ENGINE_ALLOWLIST_FILE = process.env.ENGINE_ALLOWLIST_FILE || null;
 const SESSION_FILE = process.env.INSTA_SESSION_FILE || path.join(__dirname, 'instagram_session.json');
 const CLIENT_DATASET_FILE = process.env.INSTA_DATASET_FILE || path.join(__dirname, 'dataset.json');
 
-let instagramSession = { sessionId: null, csrfToken: null, userId: null };
+let instagramSession = { sessionId: null, csrfToken: null, userId: null, cookies: null };
 let activeLeads = [];
 let seenUsernames = new Set();
 let isScraping = false;
@@ -277,10 +277,12 @@ async function proxyScrapeToEngine({ job }) {
         // Sesi IG user diteruskan per-job (in-memory di VPS selama job
         // berjalan, tidak disimpan) — tanpa ini IP datacenter VPS
         // di-redirect Instagram (302) dan hasil selalu 0.
+        // Sertakan cookie jar lengkap bila ada (penanda browser asli).
         session: instagramSession.sessionId ? {
           sessionId: instagramSession.sessionId,
           csrfToken: instagramSession.csrfToken || null,
           userId: instagramSession.userId || null,
+          ...(instagramSession.cookies ? { cookies: instagramSession.cookies } : {}),
         } : null,
       }),
       signal: controller.signal,
@@ -460,7 +462,7 @@ const server = http.createServer(async (req, res) => {
   // ada kredensial kedaluwarsa yang dipakai diam-diam.
   if (pathname === '/api/session' && req.method === 'DELETE') {
     try {
-      instagramSession = { sessionId: null, csrfToken: null, userId: null };
+      instagramSession = { sessionId: null, csrfToken: null, userId: null, cookies: null };
       try { if (fs.existsSync(SESSION_FILE)) fs.unlinkSync(SESSION_FILE); } catch {}
       sessionValidityCache = null;
       // Bersihkan juga cookie Electron bila tersedia
@@ -633,7 +635,12 @@ const server = http.createServer(async (req, res) => {
       // terakhir tanpa sesi (hasil dari IP datacenter biasanya dibatasi IG).
       const reqSession = payload?.session || {};
       const effSession = reqSession.sessionId
-        ? { sessionId: reqSession.sessionId, csrfToken: reqSession.csrfToken || null, userId: reqSession.userId || null }
+        ? {
+            sessionId: reqSession.sessionId,
+            csrfToken: reqSession.csrfToken || null,
+            userId: reqSession.userId || null,
+            ...(reqSession.cookies ? { cookies: reqSession.cookies } : {}),
+          }
         : (instagramSession.sessionId ? { ...instagramSession } : {});
       const hasSession = Boolean(effSession.sessionId);
 

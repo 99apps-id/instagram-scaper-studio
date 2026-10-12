@@ -169,8 +169,14 @@ ipcMain.handle('connect-instagram', async () => {
         const userId = cookies.find(c => c.name === 'ds_user_id')?.value;
 
         if (sessionId) {
+          // Teruskan SELURUH cookie jar (mid, ig_did, datr, rur, ...) —
+          // kelengkapan kuki adalah penanda browser asli vs otomasi.
+          const cookieHeader = cookies
+            .filter(c => c.name && typeof c.value === 'string')
+            .map(c => `${c.name}=${c.value}`)
+            .join('; ');
           authWindow.close();
-          resolve({ success: true, session: { sessionId, csrfToken, userId } });
+          resolve({ success: true, session: { sessionId, csrfToken, userId, cookies: cookieHeader } });
         }
       } catch {}
     };
