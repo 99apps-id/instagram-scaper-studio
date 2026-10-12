@@ -4,5 +4,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   windowControl: (action) => ipcRenderer.invoke('window-control', action),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
-  connectInstagram: () => ipcRenderer.invoke('connect-instagram')
+  connectInstagram: () => ipcRenderer.invoke('connect-instagram'),
+  clearInstagramSession: () => ipcRenderer.invoke('clear-instagram-session')
 });

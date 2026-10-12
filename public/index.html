@@ -47,6 +47,9 @@
         <span id="sessionStatusDot" style="width: 7px; height: 7px; border-radius: 50%; background: #a8a29e; display: inline-block;"></span>
         <span id="sessionStatusText">Hubungkan Akun IG</span>
       </button>
+      <button class="btn btn-surface btn-sm" id="btnLogoutIG" aria-label="Putuskan sesi Instagram" title="Putuskan sesi Instagram di perangkat ini" style="display: none; color: var(--accent-rose);">
+        <span>Putuskan</span>
+      </button>
 
       <button class="license-pill" id="licensePill" aria-label="Status lisensi - klik untuk detail">
         <span class="license-dot" id="licenseDot"></span>
@@ -130,10 +133,16 @@
       <div class="radar-pulse-ring" aria-hidden="true"></div>
       <div style="flex: 1;">
         <div style="font-size: 0.78rem; font-weight: 700; color: #9f1239;" id="radarTitle">Menggali Intelijen Instagram…</div>
-        <div style="font-size: 0.7rem; color: #be123c;" id="radarStatus">Menghubungkan ke API profil publik…</div>
+        <div style="font-size: 0.7rem; color: #be123c;"><span id="radarStatus">Menghubungkan ke API profil publik…</span><span class="radar-dots" aria-hidden="true"></span></div>
       </div>
       <div style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #be123c;" id="radarCounter">0%</div>
     </div>
+
+    <!-- LIVE LOG TELEMETRY (alasan 0 hasil, rate-limit, sesi) -->
+    <div class="console-panel" id="consoleLiveBox" aria-live="polite" hidden></div>
+
+    <!-- BILAH PROGRES BERKILAU -->
+    <div class="scrape-progress" id="scrapeProgress" role="progressbar" aria-label="Progres scraping" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="scrapeProgressFill"></span></div>
 
     <!-- KPI STATS -->
     <div class="kpi-grid" role="region" aria-label="Statistik utama">

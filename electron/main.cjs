@@ -6,7 +6,7 @@
  * Selaras 100% dengan standar arsitektur GMST.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -178,6 +178,18 @@ ipcMain.handle('connect-instagram', async () => {
     authWindow.webContents.on('did-finish-load', checkCookies);
     authWindow.on('closed', () => resolve({ success: false, error: 'Login dibatalkan' }));
   });
+});
+
+// Hapus cookie sesi Instagram di partisi persisten (dipakai saat logout
+// agar login berikutnya benar-benar sesi baru, bukan sesi basi).
+ipcMain.handle('clear-instagram-session', async () => {
+  try {
+    const ses = session.fromPartition('persist:instagram_session');
+    await ses.clearStorageData({ storages: ['cookies'] });
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
 
 // Single instance lock

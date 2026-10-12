@@ -73,6 +73,25 @@ let sseClients = [];
 let serverStartTime = Date.now();
 let clientSaveTimer = null;
 let clientSaving = false;
+// Cache hasil validasi sesi (TTL 5 menit) agar health-check tidak
+// menghantam API Instagram setiap poll.
+let sessionValidityCache = null; // { at, valid, reason }
+
+async function getSessionValidity() {
+  if (!instagramSession.sessionId) return { valid: false, reason: 'NO_SESSION' };
+  const now = Date.now();
+  if (sessionValidityCache && now - sessionValidityCache.at < 5 * 60 * 1000) {
+    return { valid: sessionValidityCache.valid, reason: sessionValidityCache.reason };
+  }
+  try {
+    const engine = await import('./lib/instagram.js');
+    const r = await engine.validateSession(instagramSession);
+    sessionValidityCache = { at: now, valid: r.valid === true, reason: r.reason || null };
+  } catch {
+    sessionValidityCache = { at: now, valid: null, reason: 'ENGINE_MISSING' };
+  }
+  return { valid: sessionValidityCache.valid, reason: sessionValidityCache.reason };
+}
 
 // Muat sesi Instagram tersimpan
 function loadPersistedSession() {
@@ -338,6 +357,9 @@ async function runLocalScrapeJob({ query, deepMode }) {
       broadcastSSE({ type: 'status', running: false, error: err.message, code: err.code });
       throw err;
     }
+    if (err && (err.code === 'SESSION_EXPIRED' || err.status === 401)) {
+      broadcastSSE({ type: 'status', running: false, error: err.message, code: 'SESSION_EXPIRED', sessionExpired: true });
+    }
   } finally {
     currentScrapeJob.running = false;
     broadcastSSE({ type: 'status', running: false, finished: !currentScrapeJob.abort, totalLeads: activeLeads.length });
@@ -384,12 +406,17 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/health' && req.method === 'GET') {
     const token = process.env.INSTA_TOKEN || process.env.GMST_TOKEN || null;
     const lic = getLicenseStatus();
+    const wantSessionCheck = urlObj.searchParams.get('session') === 'check';
+    const sessionInfo = wantSessionCheck ? await getSessionValidity() : null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       ok: true,
       leadsCount: activeLeads.length,
       token,
       hasSession: Boolean(instagramSession.sessionId),
+      // sessionValid: true | false | null (null = belum dicek / engine absen)
+      sessionValid: sessionInfo ? sessionInfo.valid : (sessionValidityCache ? sessionValidityCache.valid : null),
+      sessionReason: sessionInfo ? sessionInfo.reason : (sessionValidityCache ? sessionValidityCache.reason : null),
       scraping: Boolean(currentScrapeJob?.running),
       engineMode: ENGINE_MODE,
       uptimeMs: Date.now() - serverStartTime,
@@ -419,8 +446,27 @@ const server = http.createServer(async (req, res) => {
       const payload = await readJsonBody(req);
       instagramSession = { ...instagramSession, ...payload };
       savePersistedSession(instagramSession);
+      sessionValidityCache = null; // reset cache validitas
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, hasSession: Boolean(instagramSession.sessionId) }));
+    } catch (err) {
+      res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // Logout Instagram: hapus sesi tersimpan (file + memori) agar tidak
+  // ada kredensial kedaluwarsa yang dipakai diam-diam.
+  if (pathname === '/api/session' && req.method === 'DELETE') {
+    try {
+      instagramSession = { sessionId: null, csrfToken: null, userId: null };
+      try { if (fs.existsSync(SESSION_FILE)) fs.unlinkSync(SESSION_FILE); } catch {}
+      sessionValidityCache = null;
+      // Bersihkan juga cookie Electron bila tersedia
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, hasSession: false }));
+      broadcastSSE({ type: 'status', running: false, message: 'Sesi Instagram diputus.' });
     } catch (err) {
       res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
@@ -623,7 +669,10 @@ const server = http.createServer(async (req, res) => {
         send({ type: 'status', running: false, finished: !aborted, totalLeads: dataset.length });
       } catch (err) {
         send({ type: 'log', message: `Error engine: ${err.message}` });
-        send({ type: 'status', running: false, error: err.message, code: err.code || 'ENGINE_FAILED' });
+        send({
+          type: 'status', running: false, error: err.message, code: err.code || 'ENGINE_FAILED',
+          ...(err && (err.code === 'SESSION_EXPIRED' || err.status === 401) ? { sessionExpired: true } : {}),
+        });
       }
       res.end();
     } catch (err) {

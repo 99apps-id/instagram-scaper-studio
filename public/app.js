@@ -7,6 +7,7 @@ let checkoutStartedAt = null;
 let chartEngagement = null;
 let chartHashtags = null;
 let hasInstagramSession = false;
+let sessionValid = null; // true | false | null (belum terverifikasi)
 
 // Payment endpoint: polling lokal bila ENGINE_URL kosong,
 // proxy ke VPS engine bila dikonfigurasi (webhook hanya ada di VPS).
@@ -31,6 +32,7 @@ const btnStopScrape = document.getElementById('btnStopScrape');
 const checkDeepScan = document.getElementById('checkDeepScan');
 const inputQuery = document.getElementById('inputQuery');
 const btnConnectIG = document.getElementById('btnConnectIG');
+const btnLogoutIG = document.getElementById('btnLogoutIG');
 const sessionStatusDot = document.getElementById('sessionStatusDot');
 const sessionStatusText = document.getElementById('sessionStatusText');
 
@@ -40,6 +42,42 @@ const btnBannerConnect = document.getElementById('btnBannerConnect');
 const scrapeRadar = document.getElementById('scrapeRadar');
 const radarStatus = document.getElementById('radarStatus');
 const radarCounter = document.getElementById('radarCounter');
+const scrapeProgress = document.getElementById('scrapeProgress');
+const scrapeProgressFill = document.getElementById('scrapeProgressFill');
+const consoleLiveBox = document.getElementById('consoleLiveBox');
+
+// Tampilkan/sembunyikan radar + bilah progres sekaligus
+function setRadarVisible(on) {
+  if (scrapeRadar) scrapeRadar.style.display = on ? 'flex' : 'none';
+  if (scrapeProgress) scrapeProgress.hidden = !on;
+}
+
+// Update % + kilau bilah progres
+function setScrapeProgress(pct) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  if (radarCounter) radarCounter.textContent = `${p}%`;
+  if (scrapeProgressFill) scrapeProgressFill.style.width = `${p}%`;
+  if (scrapeProgress) scrapeProgress.setAttribute('aria-valuenow', String(p));
+}
+
+function appendLog(message, kind = '') {
+  if (!consoleLiveBox) return;
+  consoleLiveBox.hidden = false;
+  const line = document.createElement('div');
+  if (kind) line.className = kind;
+  const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+  line.textContent = `[${time}] ${message}`;
+  consoleLiveBox.appendChild(line);
+  while (consoleLiveBox.children.length > 60) consoleLiveBox.firstChild.remove();
+  consoleLiveBox.scrollTop = consoleLiveBox.scrollHeight;
+}
+
+function clearLog() {
+  if (consoleLiveBox) {
+    consoleLiveBox.innerHTML = '';
+    consoleLiveBox.hidden = true;
+  }
+}
 
 // License Modal & UI
 const licensePill = document.getElementById('licensePill');
@@ -130,14 +168,26 @@ async function loadPersistedLeads() {
   } catch {}
 }
 
-async function checkHealth() {
+async function checkHealth(withSessionCheck = false) {
   try {
-    const res = await fetch('/api/health');
+    const res = await fetch(withSessionCheck ? '/api/health?session=check' : '/api/health');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     hasInstagramSession = Boolean(data.hasSession);
+    // sessionValid: true | false | null (null = belum terverifikasi)
+    sessionValid = data.hasSession ? data.sessionValid : false;
 
-    if (hasInstagramSession) {
+    if (hasInstagramSession && sessionValid === false) {
+      // Sesi ada tapi mati: tampilkan status kedaluwarsa + tombol putus
+      if (sessionStatusDot) sessionStatusDot.style.background = '#b45309';
+      if (sessionStatusText) sessionStatusText.textContent = 'Sesi Kedaluwarsa — Hubungkan Ulang';
+      if (sessionAlertBanner) {
+        sessionAlertBanner.style.display = 'flex';
+        const bannerText = sessionAlertBanner.querySelector('span');
+        if (bannerText) bannerText.textContent = 'Sesi Instagram kedaluwarsa. Hubungkan ulang akun IG Anda untuk melanjutkan scraping.';
+      }
+      if (btnConnectIG) btnConnectIG.title = 'Sesi kedaluwarsa — klik untuk login ulang';
+    } else if (hasInstagramSession) {
       if (sessionStatusDot) sessionStatusDot.style.background = '#047857';
       if (sessionStatusText) sessionStatusText.textContent = 'Instagram Terhubung';
       if (sessionAlertBanner) sessionAlertBanner.style.display = 'none';
@@ -148,9 +198,35 @@ async function checkHealth() {
       if (sessionAlertBanner) sessionAlertBanner.style.display = 'flex';
       if (btnConnectIG) btnConnectIG.title = 'Klik untuk menghubungkan sesi akun Instagram Anda';
     }
+    if (btnLogoutIG) btnLogoutIG.style.display = hasInstagramSession ? '' : 'none';
   } catch {
     if (sessionStatusText) sessionStatusText.textContent = 'Server tidak merespons';
   }
+}
+
+async function logoutInstagram() {
+  if (!confirm('Putuskan sesi Instagram di perangkat ini? Anda perlu login ulang untuk scraping.')) return;
+  try {
+    await fetch('/api/session', { method: 'DELETE' });
+  } catch {}
+  try {
+    if (window.electronAPI && typeof window.electronAPI.clearInstagramSession === 'function') {
+      await window.electronAPI.clearInstagramSession();
+    }
+  } catch {}
+  hasInstagramSession = false;
+  sessionValid = false;
+  await checkHealth();
+  showToast('Sesi Instagram diputus.', 'info');
+}
+
+function handleSessionExpired(message) {
+  hasInstagramSession = true;
+  sessionValid = false;
+  checkHealth();
+  showToast(message || 'Sesi Instagram kedaluwarsa. Menghubungkan ulang...', 'warning');
+  // Tawarkan login ulang langsung
+  triggerConnectInstagram();
 }
 
 async function fetchLicense() {
@@ -569,13 +645,15 @@ function renderTable() {
     const waLink = l.phone ? `<a href="https://wa.me/${l.phone}" target="_blank" rel="noopener" class="btn btn-surface btn-sm" style="color: #047857; padding: 0.2rem 0.5rem; text-decoration: none;">Chat WA</a>` : '-';
     const emailLink = l.email ? `<a href="mailto:${escapeHtml(l.email)}" style="color: #1d4ed8; text-decoration: none;">${escapeHtml(l.email)}</a>` : '-';
     const tagsHtml = (l.topHashtags || []).slice(0, 3).map(t => `<span class="badge-tag">${escapeHtml(t)}</span>`).join(' ') || '-';
+    const viaBadge = l.via === 'fallback' ? ` <span class="badge-tag" title="Username dari pencarian publik, tanpa metrik (butuh sesi IG untuk data lengkap)">publik</span>` : '';
+    const rowClass = idx === activeLeads.length - 1 ? ' class="lead-row-new"' : '';
 
     return `
-      <tr>
+      <tr${rowClass}>
         <td style="text-align: center; color: var(--ink-muted); font-variant-numeric: tabular-nums;">${idx + 1}</td>
         <td>
           <div style="font-weight: 700; color: var(--ink-primary);">${escapeHtml(l.fullName || l.username)}</div>
-          <a href="${escapeHtml(l.profileUrl || `https://www.instagram.com/${l.username}/`)}" target="_blank" rel="noopener" style="font-size: 0.725rem; color: var(--accent-rose); text-decoration: none;">@${escapeHtml(l.username)}</a>
+          <a href="${escapeHtml(l.profileUrl || `https://www.instagram.com/${l.username}/`)}" target="_blank" rel="noopener" style="font-size: 0.725rem; color: var(--accent-rose); text-decoration: none;">@${escapeHtml(l.username)}</a>${viaBadge}
         </td>
         <td><span class="badge-tag">${escapeHtml(l.category || 'General')}</span></td>
         <td>
@@ -608,15 +686,30 @@ function connectSSE() {
         const data = JSON.parse(e.data);
       if (data.type === 'status') {
         if (data.running) {
-          if (scrapeRadar) scrapeRadar.style.display = 'flex';
+          setRadarVisible(true);
           if (btnStopScrape) btnStopScrape.style.display = 'inline-flex';
           if (btnStartScrape) btnStartScrape.disabled = true;
           if (radarStatus) radarStatus.textContent = data.message || 'Memproses pencarian...';
         } else {
-          if (scrapeRadar) scrapeRadar.style.display = 'none';
+          setRadarVisible(false);
           if (btnStopScrape) btnStopScrape.style.display = 'none';
           if (btnStartScrape) btnStartScrape.disabled = Boolean(licenseState?.blocked);
+          if (data.sessionExpired) {
+            handleSessionExpired(data.error);
+          } else if (data.error) {
+            appendLog(data.error, 'log-err');
+            showToast(data.error, 'error');
+          } else if (data.finished) {
+            appendLog(`Selesai — ${activeLeads.length} leads terkumpul.`, 'log-ok');
+          }
         }
+      }
+      if (data.type === 'log') {
+        if (radarStatus) radarStatus.textContent = data.message;
+        const msg = String(data.message || '');
+        const kind = /gagal|error|batas|limit|ditolak|kedaluwarsa/i.test(msg) ? 'log-err'
+          : /menunggu|membatasi|tanpa sesi|terbatas/i.test(msg) ? 'log-warn' : '';
+        appendLog(msg, kind);
       }
       if (data.type === 'lead') {
         const exists = activeLeads.some(item => item.username?.toLowerCase() === data.lead.username?.toLowerCase());
@@ -625,7 +718,7 @@ function connectSSE() {
           renderTable();
         }
         if (radarStatus) radarStatus.textContent = data.message;
-        if (radarCounter) radarCounter.textContent = `${data.progress || 0}%`;
+        setScrapeProgress(data.progress || 0);
       }
       } catch {}
     };
@@ -657,10 +750,13 @@ async function triggerConnectInstagram() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initCharts();
-  checkHealth();
+  checkHealth(true); // verifikasi validitas sesi saat buka (cache 5 mnt di server)
   loadPersistedLeads();
   fetchLicense();
   connectSSE();
+
+  // Putuskan sesi Instagram
+  if (btnLogoutIG) btnLogoutIG.addEventListener('click', logoutInstagram);
 
   // Start Scrape
   if (btnStartScrape) {
@@ -686,11 +782,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const deepMode = checkDeepScan ? checkDeepScan.checked : false;
 
       btnStartScrape.disabled = true;
-      if (scrapeRadar) scrapeRadar.style.display = 'flex';
+      setRadarVisible(true);
       if (btnStopScrape) btnStopScrape.style.display = 'inline-flex';
+      clearLog();
+      appendLog(`Mencari "${query}"...`);
 
       if (radarStatus) radarStatus.textContent = `Mencari profil Instagram untuk: ${query}...`;
-      if (radarCounter) radarCounter.textContent = '0%';
+      setScrapeProgress(0);
 
       try {
         const res = await fetch('/api/scrape/start', {
@@ -706,14 +804,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (err.code === 'LICENSE_REQUIRED') openLicenseModal('expired');
           } catch {}
           showToast(msg, 'error');
-          if (scrapeRadar) scrapeRadar.style.display = 'none';
+          setRadarVisible(false);
           if (btnStopScrape) btnStopScrape.style.display = 'none';
           btnStartScrape.disabled = Boolean(licenseState?.blocked);
         }
       } catch {
         showToast('Server tidak merespons. Pastikan aplikasi terbuka penuh lalu coba lagi.', 'error');
         btnStartScrape.disabled = Boolean(licenseState?.blocked);
-        if (scrapeRadar) scrapeRadar.style.display = 'none';
+        setRadarVisible(false);
         if (btnStopScrape) btnStopScrape.style.display = 'none';
       }
     });
