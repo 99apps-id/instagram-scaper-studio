@@ -32,7 +32,11 @@ import {
   paymentStoreFile,
 } from './lib/payment.js';
 import { executeScrapePlan } from './lib/scrape-runner.js';
-import { exportInstagramLeadsToExcel } from './lib/excel.js';
+
+// NOTE: ./lib/excel.js (exceljs + rantai native unzipper) di-load LAZY saat
+// export agar child server Electron tidak crash bila resolver asar gagal
+// menemukan sub-dependensi (kasus: Cannot find module 'function-bind').
+// Lihat lazyExportExcel() di handler /api/export.
 
 // NOTE: ./lib/instagram.js (engine scraping Instagram) TIDAK diimpor statis.
 // Ia di-load lazy oleh scrape-runner agar paket klien (ENGINE_MODE=client)
@@ -629,7 +633,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // EXPORT EXCEL
+  // EXPORT DATA (XLSX, CSV, JSON)
   if (pathname === '/api/export' && req.method === 'GET') {
     const lic = getLicenseStatus();
     if (lic.blocked) {
@@ -638,12 +642,60 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const tmpPath = path.join(os.tmpdir(), `Insta_Leads_${Date.now()}.xlsx`);
+    const format = String(urlObj.searchParams.get('format') || 'xlsx').toLowerCase();
+    const safeLabel = `Instagram_Leads_${Date.now()}`;
+
+    if (format === 'csv') {
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${safeLabel}.csv"`,
+      });
+      res.write('\uFEFF'); // UTF-8 BOM
+      res.write('No,Username,Nama Bisnis / Profil,Kategori,WhatsApp / Telepon,Email Bisnis,Followers,Following,Total Post,Engagement Rate (%),Rata-rata Likes,Rata-rata Komentar,Top Hashtags,Bio Lengkap,Website / Link Bio,URL Profil\n');
+
+      activeLeads.forEach((item, idx) => {
+        const line = [
+          idx + 1,
+          csvCell(item.username ? `@${item.username}` : ''),
+          csvCell(item.fullName || ''),
+          csvCell(item.category || ''),
+          csvCell(item.phone || ''),
+          csvCell(item.email || ''),
+          item.followerCount || 0,
+          item.followingCount || 0,
+          item.totalPosts || 0,
+          csvCell(item.engagementRate ? `${item.engagementRate}%` : '0%'),
+          item.avgLikes || 0,
+          item.avgComments || 0,
+          csvCell(Array.isArray(item.topHashtags) ? item.topHashtags.join(', ') : ''),
+          csvCell(item.biography || ''),
+          csvCell(item.externalUrl || ''),
+          csvCell(item.profileUrl || `https://www.instagram.com/${item.username}/`),
+        ].join(',');
+        res.write(line + '\n');
+      });
+      res.end();
+      return;
+    }
+
+    if (format === 'json') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${safeLabel}.json"`,
+      });
+      res.end(JSON.stringify({ total: activeLeads.length, exportedAt: new Date().toISOString(), leads: activeLeads }, null, 2));
+      return;
+    }
+
+    // Default XLSX (lazy-load exceljs agar startup server tidak bergantung
+    // pada rantai dependensi berat unzipper/archiver di dalam asar)
+    const tmpPath = path.join(os.tmpdir(), `${safeLabel}.xlsx`);
     try {
+      const { exportInstagramLeadsToExcel } = await import('./lib/excel.js');
       await exportInstagramLeadsToExcel(activeLeads, tmpPath);
       res.writeHead(200, {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="Instagram_Leads_Analytics.xlsx"',
+        'Content-Disposition': `attachment; filename="Instagram_Leads_Analytics.xlsx"`,
       });
       fs.createReadStream(tmpPath)
         .pipe(res)
@@ -716,16 +768,65 @@ const server = http.createServer(async (req, res) => {
       const reff = String(payload?.reff || '').trim();
       const since = String(payload?.since || '').trim();
 
+      // Mode client (aplikasi terinstal): order hanya ada di VPS engine
+      // (webhook Singapay terdaftar ke gmst.dewa.ai.id). Proxy polling
+      // ke VPS agar auto-activate jalan tanpa input serial.
+      if (ENGINE_MODE === 'client' && ENGINE_URL && !reff) {
+        try {
+          const upstream = await fetch(`${ENGINE_URL}/api/payment/auto-activate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ since: since || new Date(Date.now() - 10 * 60 * 1000).toISOString() }),
+          });
+          const data = await upstream.json().catch(() => ({}));
+          if (data && data.found && data.serial) {
+            const planOpts = { plan: data.plan || 'berbayar', durationDays: data.days || 1 };
+            const activateRes = await activateLicenseOnline(data.serial, new Date(), planOpts);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              found: true,
+              serial: data.serial,
+              plan: data.plan,
+              days: data.days,
+              status: activateRes.status,
+            }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ found: false, message: data.message || 'Pembayaran belum ditemukan atau masih diproses' }));
+          return;
+        } catch (proxyErr) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ found: false, message: `VPS belum merespons: ${proxyErr.message}` }));
+          return;
+        }
+      }
+
       let order = null;
       if (reff) {
         order = claimByReff(reff);
+        // Fallback: bila reff tidak ada lokal (mode client / dev tanpa
+        // webhook), tanya VPS engine yang menerima webhook Singapay.
+        if (!order && ENGINE_URL) {
+          try {
+            const upstream = await fetch(`${ENGINE_URL}/api/payment/auto-activate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reff }),
+            });
+            const data = await upstream.json().catch(() => ({}));
+            if (data && data.found && data.serial) {
+              order = { serial: data.serial, plan: data.plan, days: data.days };
+            }
+          } catch { /* abaikan, lanjut pesan tidak ditemukan */ }
+        }
       } else if (since) {
         order = findLatestOrderAfter(since);
       }
 
       if (!order || !order.serial) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ found: false, message: 'Pembayaran belum ditemukan atau masih diproses' }));
+        res.end(JSON.stringify({ found: false, message: 'Pembayaran belum ditemukan atau masih diproses. Jika sudah bayar, gunakan Nomor Referensi struk via tombol "Aktifkan via Ref".' }));
         return;
       }
 
@@ -797,6 +898,35 @@ const server = http.createServer(async (req, res) => {
       if (!res.headersSent) res.writeHead(code, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'error', message: err.message }));
     }
+    return;
+  }
+
+  // CLAIM PAGE: success_redirect_url payment link -> .../api/payment/claim?ref=REFF_NO
+  if (pathname === CLAIM_PATH && req.method === 'GET') {
+    const ref = String(urlObj.searchParams.get('ref') || '').trim();
+    const escapeHtmlClaim = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    let inner;
+    if (!ref) {
+      inner = `<p>Masukkan nomor referensi pembayaran dari struk/kwitansi Singapay Anda:</p>
+        <form method="GET" action="${CLAIM_PATH}">
+          <input name="ref" placeholder="cth: 18917720251110094037705" autocomplete="off" />
+          <button type="submit">Tampilkan Kode</button>
+        </form>`;
+    } else {
+      const rec = claimByReff(ref);
+      inner = rec
+        ? `<p>Pembayaran terkonfirmasi (paket <b>${escapeHtmlClaim(rec.plan)}</b>, ${rec.days} hari).</p>
+           <p>Kode aktivasi Anda:</p>
+           <div class="serial">${escapeHtmlClaim(rec.serial)}</div>
+           <p>Salin kode di atas ke aplikasi Insta Scraper Studio: menu Pengaturan → Lisensi → Aktivasi.</p>`
+        : `<p class="missing">Referensi tidak ditemukan. Periksa kembali nomornya atau hubungi support@99apps.id.</p>
+           <p><a href="${CLAIM_PATH}">← Coba lagi</a></p>`;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Klaim Kode Aktivasi Insta Scraper</title>
+<style>body{font-family:system-ui,sans-serif;background:#f8fafc;color:#0f172a;display:flex;justify-content:center;padding:2rem 1rem}main{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1.5rem;max-width:440px;width:100%}h1{font-size:1.05rem}input{width:100%;padding:.55rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9rem;margin:.5rem 0}button{background:#0f172a;color:#fff;border:none;border-radius:6px;padding:.55rem 1rem;font-weight:700;cursor:pointer}.serial{font-family:monospace;font-size:1.25rem;font-weight:800;letter-spacing:.06em;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:.7rem;text-align:center;color:#047857}.missing{color:#be123c}a{color:#2563eb}</style>
+</head><body><main><h1>Klaim Kode Aktivasi</h1>${inner}</main></body></html>`);
     return;
   }
 

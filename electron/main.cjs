@@ -84,7 +84,7 @@ function startServer() {
         LICENSE_FILE: path.join(userDataPath, 'license.json'),
         ELECTRON_RUN_AS_NODE: '1',
         ENGINE_MODE: app.isPackaged ? 'client' : (process.env.ENGINE_MODE || 'local'),
-        ENGINE_URL: process.env.ENGINE_URL || 'https://insta.dewa.ai.id'
+        ENGINE_URL: process.env.ENGINE_URL || 'https://insta.dewa.ai.id',
       },
       stdio: logStream ? ['ignore', logStream, logStream] : 'ignore',
       windowsHide: true,
@@ -234,6 +234,14 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     createWindow();
+    mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      mainLog(`window did-fail-load code=${code} desc=${desc} url=${url}`);
+    });
+    mainWindow.webContents.on('render-process-gone', (_e, details) => {
+      mainLog(`window render-process-gone reason=${details && details.reason}`);
+    });
+    mainWindow.on('unresponsive', () => mainLog('window unresponsive'));
+    mainWindow.on('closed', () => mainLog('window closed oleh user/sistem'));
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -248,8 +256,16 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
+    try {
+      fs.appendFileSync(path.join(userDataPath, 'main.log'), `[${new Date().toISOString()}] before-quit (windows=${BrowserWindow.getAllWindows().length})\n`);
+    } catch {}
     if (serverProc && serverProc.exitCode === null) {
       try { serverProc.kill(); } catch {}
     }
+  });
+  process.on('uncaughtException', (err) => {
+    try {
+      fs.appendFileSync(path.join(userDataPath, 'main.log'), `[${new Date().toISOString()}] uncaughtException: ${err && err.stack || err}\n`);
+    } catch {}
   });
 }

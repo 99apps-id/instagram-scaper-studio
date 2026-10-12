@@ -53,36 +53,75 @@
         <span id="licensePillText">Memeriksa lisensi…</span>
       </button>
 
-      <!-- Settings Dropdown -->
-      <div class="dropdown-container" id="settingsDropdown">
-        <button class="btn btn-surface btn-sm" id="btnSettingsMenu" aria-label="Pengaturan" aria-haspopup="true" aria-expanded="false">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </button>
-        <div class="dropdown-menu" id="settingsMenu" role="menu" hidden>
-          <a class="dropdown-item" href="#" id="menuLicense" role="menuitem">Lisensi</a>
-          <a class="dropdown-item" href="#" id="menuFAQ" role="menuitem">FAQ</a>
-          <a class="dropdown-item" href="#" id="menuAbout" role="menuitem">Tentang</a>
-          <div class="dropdown-divider"></div>
-          <a class="dropdown-item" href="#" id="menuExit" role="menuitem" style="color: var(--accent-rose);">Keluar</a>
+        <!-- Settings Dropdown -->
+        <div class="dropdown-container" id="settingsDropdown">
+          <button class="btn btn-surface btn-sm" id="btnSettingsMenu" title="Pengaturan" aria-label="Pengaturan" aria-haspopup="true" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Pengaturan</span>
+          </button>
+          <div class="dropdown-menu" id="settingsMenu" role="menu">
+            <a class="dropdown-item" href="#" id="menuLicense" role="menuitem">Lisensi</a>
+            <a class="dropdown-item" href="#" id="menuFAQ" role="menuitem">FAQ</a>
+            <a class="dropdown-item" href="#" id="menuAbout" role="menuitem">Tentang</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="#" id="menuExit" role="menuitem" style="color: var(--accent-rose);">Keluar</a>
+          </div>
         </div>
-      </div>
 
-      <a class="btn btn-emerald btn-sm" href="/api/export" id="btnExport" aria-label="Unduh Excel">
-        <span>Unduh Excel (.xlsx)</span>
-      </a>
+        <button class="btn btn-surface btn-sm" id="btnReloadDataset" title="Muat ulang master data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Refresh</span>
+        </button>
+
+        <div class="dropdown-container">
+          <button class="btn btn-emerald btn-sm" id="btnExportMenu" aria-haspopup="true" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Unduh Data</span>
+          </button>
+          <div class="dropdown-menu" id="dropdownMenu" role="menu">
+            <div class="dropdown-group-label" style="padding: 0.35rem 0.85rem 0.2rem; font-size: 0.68rem; font-weight: 700; color: var(--ink-muted); text-transform: uppercase;">Format Unduhan</div>
+            <a class="dropdown-item" href="/api/export?format=xlsx" id="menuExportXlsx" download style="color: var(--accent-emerald); font-weight: 600;">Excel Workbook (.xlsx)</a>
+            <a class="dropdown-item" href="/api/export?format=csv" id="menuExportCsv" download>CSV Spreadsheet (.csv) UTF-8 BOM</a>
+            <a class="dropdown-item" href="/api/export?format=json" id="menuExportJson" download>JSON Dataset (.json)</a>
+          </div>
+        </div>
     </div>
   </header>
 
   <div class="app-container">
 
+    <!-- SESSION BANNER SLOT (dipindah dari navbar agar layout benar) -->
+    <div id="sessionBannerSlot">
+      <!-- ALERT BANNER: JIKA BELUM HUBUNGKAN INSTAGRAM -->
+      <div id="sessionAlertBanner" style="display: none; align-items: center; justify-content: space-between; background: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span style="font-size: 1.2rem;">!</span>
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #9f1239;">Akun Instagram Belum Terhubung</div>
+            <div style="font-size: 0.72rem; color: #be123c;">Hubungkan akun Instagram Anda sekali untuk mengekstrak kontak lengkap (WhatsApp, Email, Engagement). Sesi login tersimpan aman di perangkat ini.</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnBannerConnect" style="background: #e11d48; border-color: #be123c; white-space: nowrap;">
+          Hubungkan Sekarang
+        </button>
+      </div>
+    </div>
+
     <!-- QUERY HERO -->
     <div class="query-card">
       <input type="text" id="inputQuery" class="query-input" placeholder="Masukkan kata kunci atau hashtag target (cth: kuliner jogja, skincare jakarta, cafe bandung)..." aria-label="Kata kunci pencarian">
+      <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; font-weight: 600; color: var(--ink-secondary); cursor: pointer; user-select: none;">
+        <input type="checkbox" id="checkDeepScan" style="accent-color: var(--accent-rose); width: 15px; height: 15px;">
+        <span>Deep Scan</span>
+      </label>
       <button class="btn btn-primary" id="btnStartScrape" aria-label="Mulai analisa">
         <span>Mulai Analisa</span>
+      </button>
+      <button class="btn btn-surface btn-sm" id="btnStopScrape" style="display: none; color: #be123c;" aria-label="Hentikan scraping">
+        <span>Stop</span>
       </button>
     </div>
 
@@ -166,114 +205,126 @@
 
   </div>
 
-  <!-- LICENSE DRAWER (Slide-over) -->
-  <div class="drawer-backdrop" id="licenseDrawerBackdrop" aria-hidden="true"></div>
-  <aside class="drawer" id="licenseDrawer" role="dialog" aria-modal="true" aria-labelledby="licenseDrawerTitle" hidden>
-    <div class="drawer-header">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;">
-        <h2 id="licenseDrawerTitle">Aktivasi Insta Scraper Studio</h2>
-      </div>
-      <button class="drawer-close" id="licenseDrawerClose" aria-label="Tutup">✕</button>
-    </div>
-    <div class="drawer-content">
-      <p style="font-size: 0.8rem; color: var(--ink-muted); margin-bottom: 1.25rem;">
-        Pilih paket langganan via QRIS Singapay atau masukkan kode aktivasi yang telah Anda miliki.
-      </p>
-
-      <!-- Payment Plans -->
-      <div class="drawer-section">
-        <div class="drawer-section-title">Pilih Paket (QRIS Singapay)</div>
-        <div id="licensePlansContainer"></div>
-      </div>
-
-      <!-- Divider -->
-      <div class="drawer-divider">Atau</div>
-
-      <!-- Manual Activation -->
-      <div class="drawer-section">
-        <div class="drawer-section-title">Kode Aktivasi</div>
-        <input type="text" id="licenseSerialInput" class="drawer-input" placeholder="GMST-YYMM-XXXXXX" spellcheck="false" autocomplete="off" aria-label="Kode aktivasi">
-        <div class="drawer-btn-row">
-          <button class="btn btn-primary" id="btnActivateLicense" style="flex: 1;">Aktivasi Sekarang</button>
-          <button class="btn btn-surface" id="btnContinueTrial" style="flex: 1;">Lanjutkan Trial 3 Hari</button>
-        </div>
-        <div id="licenseError" style="font-size: 0.75rem; color: var(--accent-rose); margin-top: 0.5rem; min-height: 1.2rem; display: none;"></div>
-      </div>
-
-      <!-- Deactivate (shown when activated) -->
-      <div class="drawer-section" id="deactivateSection" style="display: none;">
-        <button class="btn btn-surface" id="btnDeactivateLicense" style="width: 100%; color: var(--accent-rose);">Nonaktifkan Lisensi di Perangkat Ini</button>
-        <p style="font-size: 0.7rem; color: var(--ink-muted); margin-top: 0.5rem;">Kode aktivasi dapat dipakai ulang di perangkat lain setelah dinonaktifkan.</p>
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <span>ID Instalasi: <code id="drawerInstallId">-</code></span>
-      <button class="btn btn-surface btn-sm" id="btnCopyInstallId">Salin</button>
-    </div>
-  </aside>
-
   <!-- FAQ MODAL -->
   <div class="license-backdrop" id="faqModal" hidden>
-    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="faqTitle" style="max-width: 560px;">
-      <div class="drawer-header">
-        <h2 id="faqTitle">Pertanyaan Umum (FAQ)</h2>
-        <button class="drawer-close" id="faqClose" aria-label="Tutup">✕</button>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="faqTitle">
+      <div class="license-brand">
+        <div>
+          <h2 id="faqTitle">FAQ — Pertanyaan Umum</h2>
+          <p>Insta Scraper Studio</p>
+        </div>
       </div>
-      <div class="drawer-content">
-        <details class="faq-item">
-          <summary>Bagaimana cara mengaktifkan lisensi?</summary>
-          <p>Buka menu <strong>Pengaturan → Lisensi</strong>, pilih paket QRIS Singapay atau masukkan kode aktivasi manual, lalu klik <strong>Aktivasi Sekarang</strong>.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Apakah saya harus menghubungkan akun Instagram?</summary>
-          <p>Tidak wajib, tetapi sangat disarankan. Menghubungkan akun menghindari rate limit dan memungkinkan akses ke data lengkap (WhatsApp, Email, Engagement Rate). Klik tombol <strong>Hubungkan Akun IG</strong> di toolbar.</p>
-        </details>
-        <details class="faq-item">
+      <div class="faq-list">
+        <details open>
           <summary>Berapa lama masa trial gratis?</summary>
-          <p>3 hari penuh sejak aplikasi pertama kali dibuka. Setelah masa trial habis, scraping dan export Excel diblokir hingga lisensi diaktifkan.</p>
+          <p>3 hari penuh sejak aplikasi pertama kali dibuka di perangkat ini. Status hari tersisa tampil di pill lisensi bilah navigasi.</p>
         </details>
-        <details class="faq-item">
-          <summary>Data saya disimpan di mana?</summary>
-          <p>Semua data scraping dan sesi disimpan <strong>lokal di perangkat Anda</strong> (folder <code>%APPDATA%/Insta Scraper Studio</code>). Tidak ada data yang dikirim ke server eksternal.</p>
+        <details>
+          <summary>Bagaimana cara mengaktifkan lisensi?</summary>
+          <p>Buka menu <strong>Pengaturan → Lisensi</strong>, pilih paket via QRIS Singapay (aplikasi aktif otomatis) atau masukkan kode aktivasi serial Anda lalu klik <strong>Aktivasi Sekarang</strong>.</p>
         </details>
-        <details class="faq-item">
-          <summary>Bagaimana cara memindahkan lisensi ke komputer lain?</summary>
-          <p>Buka menu <strong>Pengaturan → Lisensi → Nonaktifkan Lisensi</strong> di komputer lama, lalu masukkan kode aktivasi yang sama di komputer baru.</p>
+        <details>
+          <summary>Apakah saya harus menghubungkan akun Instagram?</summary>
+          <p>Tidak wajib, tetapi sangat disarankan. Menghubungkan akun menghindari rate limit dan memungkinkan akses ke data kontak lengkap (WhatsApp, Email & Engagement). Sesi disimpan aman di perangkat Anda.</p>
         </details>
-        <details class="faq-item">
-          <summary>Apakah aplikasi ini aman?</summary>
-          <p>Ya. Aplikasi tidak mengirim data pribadi ke server mana pun. Scraping dilakukan melalui API publik Instagram. Integritas aplikasi diverifikasi saat startup.</p>
+        <details>
+          <summary>Saya ganti perangkat / laptop, bagaimana?</summary>
+          <p>Buka menu <strong>Pengaturan → Lisensi → Nonaktifkan lisensi di perangkat ini</strong> di laptop lama, lalu masukkan nomor serial yang sama di laptop baru Anda.</p>
+        </details>
+        <details>
+          <summary>Apakah data hasil scrape saya disimpan aman?</summary>
+          <p>Ya. Semua data tersimpan 100% lokal di perangkat Anda (folder dataset aplikasi). Tidak ada data leads yang dikirim ke pihak luar.</p>
+        </details>
+        <details>
+          <summary>Kode aktivasi saya ditolak padahal baru dibeli?</summary>
+          <p>Pastikan format huruf besar semua tanpa spasi (cth: GMST-YYMM-XXXXXX). Bila ada kendala, hubungi <a href="mailto:support@99apps.id">support@99apps.id</a> sertakan ID instalasi Anda.</p>
         </details>
       </div>
+      <button class="btn btn-surface" id="btnFaqClose" style="width: 100%; justify-content: center; margin-top: 1rem;">Tutup</button>
     </div>
   </div>
 
   <!-- ABOUT MODAL -->
   <div class="license-backdrop" id="aboutModal" hidden>
-    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" style="max-width: 480px;">
-      <div class="drawer-header">
-        <h2 id="aboutTitle">Tentang Insta Scraper Studio</h2>
-        <button class="drawer-close" id="aboutClose" aria-label="Tutup">✕</button>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+      <div class="license-brand">
+        <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover;">
+        <div>
+          <h2 id="aboutTitle">Tentang Insta Scraper Studio</h2>
+          <p>Instagram Business Intelligence Platform v0.1.0</p>
+        </div>
       </div>
-      <div class="drawer-content">
-        <div style="text-align: center; margin-bottom: 1rem;">
-          <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" style="width: 80px; height: 80px; border-radius: 16px; object-fit: cover;">
+      <div class="about-rows">
+        <div class="about-row"><span>Engine Server</span><code id="aboutEngineUrl">https://insta.dewa.ai.id</code></div>
+        <div class="about-row"><span>ID Instalasi</span><code id="aboutInstallId">-</code></div>
+        <div class="about-row"><span>Status Lisensi</span><code id="aboutLicenseState">-</code></div>
+        <div class="about-row"><span>Mode Scraping</span><code id="aboutEngineMode">VPS High-Speed Engine</code></div>
+      </div>
+      <p class="license-desc" style="margin-top: 0.85rem;">
+        Platform intelijen direktori profil bisnis Instagram Indonesia — dilengkapi deteksi nomor WhatsApp, email, engagement rate, visualisasi analitik, ekspor multi-format (Excel/CSV/JSON), dan lisensi serial per perangkat.
+      </p>
+      <button class="btn btn-surface" id="btnAboutClose" style="width: 100%; justify-content: center;">Tutup</button>
+    </div>
+  </div>
+
+  <!-- LICENSE MODAL (Onboarding / Trial / Status / Aktivasi / Kedaluwarsa) -->
+  <div class="license-backdrop" id="licenseModal" hidden>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="licenseTitle">
+      <div class="license-brand">
+        <img src="/insta-scraper-studio.png" alt="Insta Scraper Studio" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover;">
+        <div>
+          <h2 id="licenseTitle">Aktivasi Aplikasi</h2>
+          <p id="licenseSubtitle">Insta Scraper Studio — Intelligence Platform</p>
         </div>
-        <p style="text-align: center; color: var(--ink-secondary); margin-bottom: 1rem;">
-          <strong>Insta Scraper Studio</strong> v0.1.0<br>
-          Instagram Business Intelligence & Leads Analytics
-        </p>
-        <div style="font-size: 0.8rem; color: var(--ink-muted); line-height: 1.8;">
-          <div><strong>ID Instalasi:</strong> <code id="aboutInstallId">-</code></div>
-          <div><strong>Status Lisensi:</strong> <code id="aboutLicenseState">-</code></div>
-          <div><strong>Mode Engine:</strong> Local</div>
-          <div><strong>Dibangun dengan:</strong> Electron, Node.js, Chart.js</div>
+      </div>
+      <p class="license-desc" id="licenseDesc"></p>
+
+      <!-- KARTU PILIHAN METODE PEMBAYARAN SINGAPAY -->
+      <div class="license-plans-section" id="licensePlansSection">
+        <div class="license-plans-title">
+          <span>Pilih Paket Lisensi</span>
+          <span style="font-size: 0.65rem; color: var(--accent-emerald); font-weight: 700;">QRIS / Virtual Account Singapay</span>
         </div>
-        <p style="margin-top: 1.25rem; font-size: 0.75rem; color: var(--ink-muted); text-align: center;">
-          © 2025 Naracitra. Hak cipta dilindungi.<br>
-          Dukungan: <a href="mailto:support@99apps.id" style="color: var(--accent-rose);">support@99apps.id</a>
+        <div class="license-plans-grid" id="licensePlansGrid">
+          <!-- Render dinamis dari /api/payment/options -->
+        </div>
+        <p class="license-plans-footnote">
+          Setelah pembayaran berhasil, aplikasi akan <b>aktif otomatis</b> dalam beberapa detik.
         </p>
+
+        <!-- STATUS POLLING AKTIF OTOMATIS -->
+        <div class="license-auto-status" id="licenseAutoStatus" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="licenseAutoStatusText">Menunggu pembayaran Singapay... (aplikasi aktif otomatis)</span>
+        </div>
+
+        <!-- AKTIFKAN LANGSUNG VIA NOMOR REFERENSI STRUK -->
+        <div class="license-quick-reff">
+          <input type="text" id="inputQuickReff" placeholder="Nomor Referensi Struk Singapay (cth: 189177...)" autocomplete="off" spellcheck="false">
+          <button class="btn btn-surface btn-sm" id="btnVerifyQuickReff" type="button">Aktifkan via Ref</button>
+        </div>
+      </div>
+
+      <div class="license-divider">Atau masukkan kode aktivasi</div>
+
+      <label class="license-label" for="licenseSerialInput">Kode aktivasi</label>
+      <input type="text" id="licenseSerialInput" class="license-input" placeholder="Masukkan kode aktivasi (GMST-YYMM-XXXXXX)" autocomplete="off" spellcheck="false" maxlength="24">
+      <div class="license-error" id="licenseError" hidden></div>
+      <div class="license-actions" style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-primary" id="btnActivateLicense" style="flex: 1; justify-content: center;">
+          <span>Aktivasi Sekarang</span>
+        </button>
+      </div>
+      <button class="btn btn-surface" id="btnContinueTrial" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+        <span id="btnContinueTrialText">Lanjutkan gratis selama 3 hari</span>
+      </button>
+      <button class="btn btn-surface btn-sm" id="btnDeactivateLicense" style="width: 100%; justify-content: center; margin-top: 0.5rem; color: var(--accent-rose);" hidden>
+        <span>Nonaktifkan lisensi perangkat ini</span>
+      </button>
+      <p class="license-support">Belum punya kode? Minta ke <a href="mailto:support@99apps.id?subject=Permintaan%20Kode%20Aktivasi%20Insta%20Scraper">support@99apps.id</a> (sertakan ID instalasi di bawah).</p>
+      <div class="license-meta">
+        <span>ID Instalasi: <code id="licenseInstallId">-</code></span>
+        <button class="btn btn-surface btn-sm" id="btnCopyInstallId" style="padding: 0.15rem 0.5rem; font-size: 0.68rem;">Salin</button>
       </div>
     </div>
   </div>

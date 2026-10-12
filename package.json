@@ -12,12 +12,13 @@
     "dist:linux": "electron-builder --linux"
   },
   "dependencies": {
-    "exceljs": "^4.4.0"
+    "call-bind-apply-helpers": "1.0.2",
+    "exceljs": "^4.4.0",
+    "function-bind": "1.1.2"
   },
   "devDependencies": {
     "electron": "^34.0.0",
-    "electron-builder": "^25.0.0",
-    "sharp": "^0.35.5"
+    "electron-builder": "^25.0.0"
   },
   "build": {
     "appId": "id.naracitra.insta-scraper",
@@ -56,5 +57,8 @@
       "uninstallerIcon": "electron/assets/icon.ico",
       "installerHeaderIcon": "electron/assets/icon.ico"
     }
+  },
+  "allowScripts": {
+    "electron@34.5.8": true
   }
 }
