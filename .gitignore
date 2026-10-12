@@ -5,3 +5,12 @@ release/
 .termixgo/
 *.log
 *.xlsx
+# Engine scraping Instagram hanya ada di repo PRIVATE (insta-scraper-studio).
+# Jangan commit ke repo PUBLIC ini — pola sama dengan GMST (lib/scraper.js).
+lib/instagram.js
+# State lokal per-mesin — jangan commit (trial/installId/sesi/dataset).
+license.json
+licenses.json
+payments.json
+dataset.json
+instagram_session.json

@@ -30,7 +30,11 @@
     "files": [
       "package.json",
       "server.js",
-      "lib/**/*",
+      "lib/excel.js",
+      "lib/license.js",
+      "lib/payment.js",
+      "lib/scrape-runner.js",
+      "lib/security.js",
       "public/**/*",
       "electron/main.cjs",
       "electron/preload.cjs",

@@ -84,7 +84,7 @@ function startServer() {
         LICENSE_FILE: path.join(userDataPath, 'license.json'),
         ELECTRON_RUN_AS_NODE: '1',
         ENGINE_MODE: app.isPackaged ? 'client' : (process.env.ENGINE_MODE || 'local'),
-        ENGINE_URL: process.env.ENGINE_URL || 'https://gmst.dewa.ai.id'
+        ENGINE_URL: process.env.ENGINE_URL || ''
       },
       stdio: logStream ? ['ignore', logStream, logStream] : 'ignore',
       windowsHide: true,

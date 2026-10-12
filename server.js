@@ -16,6 +16,7 @@ import {
   activateLicenseOnline,
   deactivateLicense,
   loadLicenseState,
+  validateSerial,
 } from './lib/license.js';
 import {
   WEBHOOK_PATH,
@@ -24,11 +25,19 @@ import {
   fulfillPaymentLink,
   claimByReff,
   findLatestOrderAfter,
+  normalizeLicenseEntries,
+  normalizeRevoked,
+  findPlanForSerial,
   paymentOptions,
   paymentStoreFile,
 } from './lib/payment.js';
-import { searchInstagramAccounts, fetchInstagramProfile } from './lib/instagram.js';
+import { executeScrapePlan } from './lib/scrape-runner.js';
 import { exportInstagramLeadsToExcel } from './lib/excel.js';
+
+// NOTE: ./lib/instagram.js (engine scraping Instagram) TIDAK diimpor statis.
+// Ia di-load lazy oleh scrape-runner agar paket klien (ENGINE_MODE=client)
+// dapat diedarkan TANPA file engine — hasil bedah tidak bisa scraping.
+// Pola sama dengan GMST (lib/scraper.js).
 import {
   setSecurityHeaders,
   readJsonBody,
@@ -44,7 +53,8 @@ const PORT = process.env.PORT || 3001;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const ENGINE_MODE = (process.env.ENGINE_MODE || 'local').toLowerCase();
-const ENGINE_URL = (process.env.ENGINE_URL || 'https://gmst.dewa.ai.id').replace(/\/+$/, '');
+const ENGINE_URL = (process.env.ENGINE_URL || '').replace(/\/+$/, '');
+const ENGINE_ALLOWLIST_FILE = process.env.ENGINE_ALLOWLIST_FILE || null;
 
 // Session & Dataset Persistence
 const SESSION_FILE = process.env.INSTA_SESSION_FILE || path.join(__dirname, 'instagram_session.json');
@@ -124,6 +134,204 @@ function scheduleDatasetSave() {
   }, 4000);
 }
 
+// ---------------------------------------------------------------------------
+// VPS ENGINE (ENGINE_MODE=engine): eksekusi scraping di server vendor.
+// Klien paket (ENGINE_MODE=client) mem-proxy ke sini; engine & secret
+// tidak pernah dikirim ke aplikasi yang diedarkan. Pola sama dengan GMST.
+// ---------------------------------------------------------------------------
+
+function readEngineAllowlist() {
+  // Format: {"licenses":[... | {serial,plan,days} ...], "revoked":[...]}
+  const candidates = [
+    ENGINE_ALLOWLIST_FILE,
+    path.join(__dirname, 'licenses.json'),
+    process.env.LICENSE_ALLOWLIST || null,
+    process.env.PAYMENT_STORE_FILE || null,
+  ].filter(Boolean);
+  for (const f of candidates) {
+    try {
+      if (fs.existsSync(f)) {
+        const data = JSON.parse(fs.readFileSync(f, 'utf8'));
+        if (Array.isArray(data.licenses)) {
+          const entries = normalizeLicenseEntries(data);
+          return {
+            licenses: new Set(entries.map((e) => e.serial)),
+            revoked: normalizeRevoked(data),
+            entries,
+          };
+        }
+      }
+    } catch { /* abaikan, lanjut kandidat berikut */ }
+  }
+  return null;
+}
+
+/** Durasi paket berbayar untuk serial (aktivasi perangkat ikut kedaluwarsa). */
+function planDurationForSerial(serial) {
+  const files = [
+    process.env.PAYMENT_STORE_FILE || null,
+    ENGINE_ALLOWLIST_FILE,
+    path.join(__dirname, 'licenses.json'),
+  ].filter(Boolean);
+  const hit = findPlanForSerial(String(serial || '').trim().toUpperCase(), files);
+  if (hit && hit.days) return { plan: hit.plan, durationDays: hit.days };
+  return null;
+}
+
+function authorizeEngineSerial(serial) {
+  const s = String(serial || '').trim();
+  // Trial tanpa serial: diizinkan dengan caps ketat + rate limit (anti-abuse).
+  if (!s) {
+    if (process.env.ENGINE_REQUIRE_SERIAL === '1') {
+      throw Object.assign(new Error('Aktivasi diperlukan untuk VPS engine.'), { status: 403, code: 'ENGINE_AUTH' });
+    }
+    return { trial: true, listed: false };
+  }
+  const check = validateSerial(s);
+  if (!check.ok) {
+    throw Object.assign(new Error(`Serial ditolak (${check.reason})`), { status: 403, code: 'ENGINE_AUTH' });
+  }
+  const needle = s.toUpperCase();
+  const list = readEngineAllowlist();
+  if (list) {
+    if (list.revoked.has(needle)) {
+      throw Object.assign(new Error('Serial telah dicabut (revoked).'), { status: 403, code: 'ENGINE_REVOKED' });
+    }
+    const strict = process.env.ENGINE_STRICT === '1';
+    if (strict && !list.licenses.has(needle)) {
+      throw Object.assign(new Error('Serial tidak terdaftar di VPS.'), { status: 403, code: 'ENGINE_NOT_LISTED' });
+    }
+    return { trial: false, listed: list.licenses.has(needle) };
+  }
+  return { trial: false, listed: true };
+}
+
+// Rate limit sederhana per IP untuk job trial (anti-abuse VPS).
+const engineTrialHits = new Map();
+function checkEngineTrialLimit(ip) {
+  const maxPerHour = Math.max(1, parseInt(process.env.ENGINE_TRIAL_PER_HOUR || '5', 10) || 5);
+  const now = Date.now();
+  const rec = engineTrialHits.get(ip);
+  if (!rec || now > rec.resetAt) {
+    engineTrialHits.set(ip, { count: 1, resetAt: now + 3600 * 1000 });
+    return true;
+  }
+  rec.count++;
+  if (rec.count > maxPerHour) return false;
+  if (engineTrialHits.size > 5000 && Math.random() < 0.01) {
+    for (const [k, v] of engineTrialHits) if (now > v.resetAt) engineTrialHits.delete(k);
+  }
+  return true;
+}
+
+function engineClientIp(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (/^[0-9a-fA-F:.]{3,45}$/.test(fwd)) return fwd;
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+// Proxy job klien -> VPS engine, teruskan event SSE-nya ke klien lokal.
+async function proxyScrapeToEngine({ job }) {
+  if (!ENGINE_URL) {
+    throw Object.assign(new Error('ENGINE_URL belum dikonfigurasi di aplikasi ini.'), { status: 503, code: 'ENGINE_NO_URL' });
+  }
+  let licState = null;
+  try { licState = loadLicenseState(); } catch { /* abaikan */ }
+  const licNow = getLicenseStatus();
+  const controller = new AbortController();
+  const abortWatcher = setInterval(() => {
+    if (currentScrapeJob?.abort) controller.abort();
+  }, 500);
+
+  try {
+    const upstream = await fetch(`${ENGINE_URL}/api/engine/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        serial: licState?.activated?.serial || '',
+        installId: licNow.installId,
+        job,
+      }),
+      signal: controller.signal,
+    });
+    if (!upstream.ok || !upstream.body) {
+      let msg = `VPS engine menolak (${upstream.status})`;
+      try {
+        const data = JSON.parse(await upstream.text());
+        if (data && data.error) msg = data.error;
+      } catch { /* pakai pesan default */ }
+      throw Object.assign(new Error(msg), { status: 502, code: 'ENGINE_UPSTREAM' });
+    }
+
+    broadcastSSE({ type: 'log', message: 'Terhubung ke VPS engine — query diproses di server.' });
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    const handleEvent = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (obj.type === 'lead' && obj.lead && obj.lead.username) {
+        const uKey = String(obj.lead.username).toLowerCase();
+        if (!seenUsernames.has(uKey)) {
+          seenUsernames.add(uKey);
+          activeLeads.push(obj.lead);
+          scheduleDatasetSave();
+        }
+      }
+      broadcastSSE(obj);
+    };
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of raw.split('\n')) {
+          const t = line.trim();
+          if (!t.startsWith('data:')) continue;
+          try { handleEvent(JSON.parse(t.slice(5).trim())); } catch { /* abaikan */ }
+        }
+      }
+    }
+  } finally {
+    clearInterval(abortWatcher);
+  }
+}
+
+// Eksekusi lokal via scrape-runner (lazy engine). Melempar ENGINE_MISSING
+// 503 bila lib/instagram.js tidak ada di instalasi ini (paket klien).
+async function runLocalScrapeJob({ query, deepMode }) {
+  broadcastSSE({ type: 'status', running: true, message: `Mencari akun ${deepMode ? '(Deep Scan)' : ''} untuk: ${query}` });
+  try {
+    const { aborted } = await executeScrapePlan(
+      { query, deepMode },
+      {
+        session: instagramSession,
+        dataset: activeLeads,
+        seen: seenUsernames,
+        onLog: (message) => broadcastSSE({ type: 'log', message }),
+        onLead: (lead, progress, message) => {
+          scheduleDatasetSave();
+          broadcastSSE({ type: 'lead', lead, progress, message });
+        },
+        shouldAbort: () => currentScrapeJob.abort,
+      }
+    );
+    if (aborted) broadcastSSE({ type: 'log', message: 'Scraping dihentikan sebelum semua profil selesai.' });
+  } catch (err) {
+    broadcastSSE({ type: 'log', message: `Error search: ${err.message}` });
+    if (err && (err.code === 'ENGINE_MISSING' || err.status === 503)) {
+      broadcastSSE({ type: 'status', running: false, error: err.message, code: err.code });
+      throw err;
+    }
+  } finally {
+    currentScrapeJob.running = false;
+    broadcastSSE({ type: 'status', running: false, finished: !currentScrapeJob.abort, totalLeads: activeLeads.length });
+  }
+}
+
 // SSE broadcast
 function broadcastSSE(data) {
   const payload = `data: ${JSON.stringify(data)}\n\n`;
@@ -162,16 +370,19 @@ const server = http.createServer(async (req, res) => {
 
   // Health check
   if (pathname === '/api/health' && req.method === 'GET') {
-    const token = process.env.GMST_TOKEN || process.env.INSTA_TOKEN || null;
+    const token = process.env.INSTA_TOKEN || process.env.GMST_TOKEN || null;
+    const lic = getLicenseStatus();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       ok: true,
       leadsCount: activeLeads.length,
       token,
       hasSession: Boolean(instagramSession.sessionId),
+      scraping: Boolean(currentScrapeJob?.running),
       engineMode: ENGINE_MODE,
       uptimeMs: Date.now() - serverStartTime,
       version: '0.1.0',
+      license: { activated: lic.activated, expired: lic.expired, blocked: lic.blocked, daysLeft: lic.daysLeft },
     }));
     return;
   }
@@ -221,7 +432,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // START SCRAPE (Deep Scraping Engine dengan Rate Guard)
+  // START SCRAPE — mode-aware (local / client-proxy / engine-only).
+  // - local  : eksekusi via scrape-runner di mesin ini (butuh lib/instagram.js).
+  // - client : paket publik — job di-proxy ke VPS engine, hasil di-relay via SSE.
+  // - engine : VPS vendor — publik tidak boleh memicu dari sini.
   if (pathname === '/api/scrape/start' && req.method === 'POST') {
     if (process.env.DISABLE_ENGINE === '1') {
       res.writeHead(403, { 'Content-Type': 'application/json' });
@@ -257,85 +471,141 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Query wajib diisi' }));
         return;
       }
+      if (query.length > 120) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Query terlalu panjang (maks 120 karakter)' }));
+        return;
+      }
 
       currentScrapeJob = { abort: false, running: true };
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, message: 'Scraping dimulai', deepMode }));
-      broadcastSSE({ type: 'status', running: true, message: `Mencari akun ${deepMode ? '(Deep Scan)' : ''} untuk: ${query}` });
+      res.end(JSON.stringify({
+        success: true,
+        message: 'Scraping dimulai',
+        deepMode,
+        engine: ENGINE_MODE === 'client' ? 'vps' : ENGINE_MODE,
+      }));
 
-      // Background scraping job
-      (async () => {
-        try {
-          // Deep query expansion jika deepMode aktif
-          const queries = [query];
-          if (deepMode) {
-            queries.push(`${query} official`, `${query} store`, `${query} business`);
-          }
+      if (ENGINE_MODE === 'client') {
+        // Mode aplikasi paket: eksekusi di VPS, hasil di-relay via SSE lokal.
+        broadcastSSE({ type: 'status', running: true, message: `Menghubungkan ke VPS engine untuk: ${query}` });
+        proxyScrapeToEngine({ job: { query, deepMode } })
+          .catch((err) => {
+            broadcastSSE({ type: 'log', message: `Error VPS engine: ${err.message}` });
+            broadcastSSE({ type: 'status', running: false, error: err.message, code: err.code || 'ENGINE_FAILED' });
+          })
+          .finally(() => { currentScrapeJob.running = false; });
+        return;
+      }
 
-          let allCandidates = [];
-          for (const q of queries) {
-            if (currentScrapeJob.abort) break;
-            try {
-              const accs = await searchInstagramAccounts(q, instagramSession);
-              allCandidates.push(...accs);
-            } catch {}
-          }
+      if (ENGINE_MODE === 'engine') {
+        currentScrapeJob.running = false;
+        broadcastSSE({ type: 'status', running: false });
+        return;
+      }
 
-          // Dedup kandidat
-          const uniqueAccounts = [];
-          const seenCandidate = new Set();
-          for (const a of allCandidates) {
-            if (!a.username) continue;
-            const u = a.username.toLowerCase();
-            if (!seenCandidate.has(u)) {
-              seenCandidate.add(u);
-              uniqueAccounts.push(a);
-            }
-          }
-
-          broadcastSSE({ type: 'log', message: `Ditemukan ${uniqueAccounts.length} akun potensial. Mengambil profil & kontak...` });
-
-          for (let i = 0; i < uniqueAccounts.length; i++) {
-            if (currentScrapeJob.abort) {
-              broadcastSSE({ type: 'log', message: 'Scraping dihentikan sebelum semua profil selesai.' });
-              break;
-            }
-
-            const acc = uniqueAccounts[i];
-            try {
-              const detail = await fetchInstagramProfile(acc.username, instagramSession);
-              const uKey = detail.username.toLowerCase();
-              if (!seenUsernames.has(uKey)) {
-                seenUsernames.add(uKey);
-                activeLeads.push(detail);
-                scheduleDatasetSave();
-              }
-
-              broadcastSSE({
-                type: 'lead',
-                lead: detail,
-                progress: Math.round(((i + 1) / uniqueAccounts.length) * 100),
-                message: `[${i + 1}/${uniqueAccounts.length}] Selesai analisa @${detail.username} (${detail.followerCount.toLocaleString()} followers)`
-              });
-
-              // Rate-Limit Guard alami
-              const delayMs = 2000 + Math.floor(Math.random() * 2000);
-              await new Promise(r => setTimeout(r, delayMs));
-            } catch (e) {
-              broadcastSSE({ type: 'log', message: `Gagal ambil detail @${acc.username}: ${e.message}` });
-            }
-          }
-        } catch (err) {
-          broadcastSSE({ type: 'log', message: `Error search: ${err.message}` });
-        } finally {
-          currentScrapeJob.running = false;
-          broadcastSSE({ type: 'status', running: false, finished: !currentScrapeJob.abort, totalLeads: activeLeads.length });
-        }
-      })();
+      // Mode local (dev & VPS-engine standalone): jalan di mesin ini.
+      runLocalScrapeJob({ query, deepMode }).catch(() => {});
     } catch (err) {
       currentScrapeJob.running = false;
-      res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      if (!res.headersSent) {
+        res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message, code: err.code || 'SCRAPE_FAILED' }));
+      }
+    }
+    return;
+  }
+
+  // VPS ENGINE: verifikasi serial tanpa membocorkan daftar (jawab ya/tidak).
+  //   GET /api/license/verify?serial=GMST-...  -> {valid:true|false}
+  if (pathname === '/api/license/verify' && req.method === 'GET') {
+    if (ENGINE_MODE !== 'engine') {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Endpoint verifikasi hanya aktif di VPS engine.' }));
+      return;
+    }
+    const serial = String(urlObj.searchParams.get('serial') || '').trim();
+    let valid = false;
+    let plan = null;
+    let days = null;
+    try {
+      if (serial) {
+        const auth = authorizeEngineSerial(serial);
+        valid = true;
+        if (!auth.trial) {
+          const pd = planDurationForSerial(serial);
+          if (pd) { plan = pd.plan; days = pd.durationDays; }
+        }
+      }
+    } catch { valid = false; }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ valid, plan, days }));
+    return;
+  }
+
+  // VPS ENGINE RUN (hanya ENGINE_MODE=engine) — eksekusi di server vendor.
+  if (pathname === '/api/engine/run' && req.method === 'POST') {
+    if (ENGINE_MODE !== 'engine') {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Engine tidak aktif di server ini.' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      const serial = String(payload?.serial || '').trim();
+      const auth = authorizeEngineSerial(serial);
+      const rawJob = payload?.job || {};
+      const query = String(rawJob.query || '').trim();
+      const deepMode = Boolean(rawJob.deepMode);
+      if (!query) throw Object.assign(new Error('Query wajib diisi'), { status: 400 });
+      if (query.length > 120) throw Object.assign(new Error('Query terlalu panjang'), { status: 400 });
+
+      const listed = auth.listed;
+      if (!listed) {
+        if (auth.trial) {
+          const ip = engineClientIp(req);
+          if (!checkEngineTrialLimit(ip)) {
+            throw Object.assign(new Error('Batas trial VPS tercapai (maksimal 5 job/jam). Aktivasi untuk tanpa batas.'), { status: 429, code: 'ENGINE_RATE_LIMIT' });
+          }
+        }
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      const send = (obj) => {
+        try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch { /* putus */ }
+      };
+      let aborted = false;
+      req.on('close', () => { aborted = true; });
+
+      // Engine VPS memakai sesi server-side (tanpa sesi klien).
+      const dataset = [];
+      const seen = new Set();
+      send({ type: 'status', running: true, message: `Mencari akun untuk: ${query}` });
+      try {
+        await executeScrapePlan(
+          { query, deepMode },
+          {
+            session: {},
+            dataset,
+            seen,
+            onLog: (message) => send({ type: 'log', message }),
+            onLead: (lead, progress, message) => send({ type: 'lead', lead, progress, message }),
+            shouldAbort: () => aborted,
+          }
+        );
+        send({ type: 'status', running: false, finished: !aborted, totalLeads: dataset.length });
+      } catch (err) {
+        send({ type: 'log', message: `Error engine: ${err.message}` });
+        send({ type: 'status', running: false, error: err.message, code: err.code || 'ENGINE_FAILED' });
+      }
+      res.end();
+    } catch (err) {
+      if (!res.headersSent) res.writeHead(err.status || 400, { 'Content-Type': 'application/json' });
+      try { res.end(JSON.stringify({ error: err.message, code: err.code || 'ENGINE_FAILED' })); } catch { /* abaikan */ }
     }
     return;
   }
@@ -473,7 +743,6 @@ const server = http.createServer(async (req, res) => {
           size += chunk.length;
           if (size > MAX_BODY_BYTES) {
             reject(Object.assign(new Error('Payload terlalu besar'), { status: 413 }));
-            req.destroy();
             return;
           }
           body += chunk;
