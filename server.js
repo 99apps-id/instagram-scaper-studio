@@ -251,6 +251,14 @@ async function proxyScrapeToEngine({ job }) {
         serial: licState?.activated?.serial || '',
         installId: licNow.installId,
         job,
+        // Sesi IG user diteruskan per-job (in-memory di VPS selama job
+        // berjalan, tidak disimpan) — tanpa ini IP datacenter VPS
+        // di-redirect Instagram (302) dan hasil selalu 0.
+        session: instagramSession.sessionId ? {
+          sessionId: instagramSession.sessionId,
+          csrfToken: instagramSession.csrfToken || null,
+          userId: instagramSession.userId || null,
+        } : null,
       }),
       signal: controller.signal,
     });
@@ -570,6 +578,15 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // Sesi untuk job ini: prioritas sesi klien per-job (in-memory,
+      // tidak disimpan), fallback ke sesi service VPS (INSTA_SESSION_FILE),
+      // terakhir tanpa sesi (hasil dari IP datacenter biasanya dibatasi IG).
+      const reqSession = payload?.session || {};
+      const effSession = reqSession.sessionId
+        ? { sessionId: reqSession.sessionId, csrfToken: reqSession.csrfToken || null, userId: reqSession.userId || null }
+        : (instagramSession.sessionId ? { ...instagramSession } : {});
+      const hasSession = Boolean(effSession.sessionId);
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -581,15 +598,17 @@ const server = http.createServer(async (req, res) => {
       let aborted = false;
       req.on('close', () => { aborted = true; });
 
-      // Engine VPS memakai sesi server-side (tanpa sesi klien).
       const dataset = [];
       const seen = new Set();
       send({ type: 'status', running: true, message: `Mencari akun untuk: ${query}` });
+      if (!hasSession) {
+        send({ type: 'log', message: 'Mode tanpa sesi Instagram: hasil dari IP server dapat dibatasi (0 akun). Hubungkan akun IG di aplikasi untuk hasil penuh.' });
+      }
       try {
         await executeScrapePlan(
           { query, deepMode },
           {
-            session: {},
+            session: effSession,
             dataset,
             seen,
             onLog: (message) => send({ type: 'log', message }),
