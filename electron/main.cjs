@@ -83,7 +83,7 @@ function startServer() {
         INSTA_DATASET_FILE: path.join(userDataPath, 'dataset.json'),
         LICENSE_FILE: path.join(userDataPath, 'license.json'),
         ELECTRON_RUN_AS_NODE: '1',
-        ENGINE_MODE: app.isPackaged ? 'client' : (process.env.ENGINE_MODE || 'local'),
+        ENGINE_MODE: (process.env.ENGINE_MODE || 'local'),
         ENGINE_URL: process.env.ENGINE_URL || 'https://insta.dewa.ai.id',
         // Lisensi tetap di VPS: aktivasi selalu diverifikasi online ke
         // engine (allowlist + revocation); offline = fallback lokal.

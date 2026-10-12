@@ -38,10 +38,10 @@ import { executeScrapePlan } from './lib/scrape-runner.js';
 // menemukan sub-dependensi (kasus: Cannot find module 'function-bind').
 // Lihat lazyExportExcel() di handler /api/export.
 
-// NOTE: ./lib/instagram.js (engine scraping Instagram) TIDAK diimpor statis.
-// Ia di-load lazy oleh scrape-runner agar paket klien (ENGINE_MODE=client)
-// dapat diedarkan TANPA file engine — hasil bedah tidak bisa scraping.
-// Pola sama dengan GMST (lib/scraper.js).
+// NOTE: ./lib/instagram.js (engine scraping Instagram) diimpor LAZY via
+// scrape-runner agar instalasi tetap boot walau file engine bermasalah.
+// Aplikasi paket (ENGINE_MODE=local) menjalankan scraping di mesin lokal
+// dengan IP pengguna (Meta membatasi IP datacenter, jadi tanpa proxy VPS).
 import {
   setSecurityHeaders,
   readJsonBody,
@@ -824,10 +824,10 @@ const server = http.createServer(async (req, res) => {
       const reff = String(payload?.reff || '').trim();
       const since = String(payload?.since || '').trim();
 
-      // Mode client (aplikasi terinstal): order hanya ada di VPS engine
-      // (webhook Singapay terdaftar ke gmst.dewa.ai.id). Proxy polling
+      // Aplikasi terinstal (engine lokal): order pembayaran hanya ada di
+      // VPS (webhook Singapay terdaftar ke gmst.dewa.ai.id). Proxy polling
       // ke VPS agar auto-activate jalan tanpa input serial.
-      if (ENGINE_MODE === 'client' && ENGINE_URL && !reff) {
+      if (ENGINE_URL && !reff) {
         try {
           const upstream = await fetch(`${ENGINE_URL}/api/payment/auto-activate`, {
             method: 'POST',

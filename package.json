@@ -42,6 +42,7 @@
       "package.json",
       "server.js",
       "lib/excel.js",
+      "lib/instagram.js",
       "lib/license.js",
       "lib/payment.js",
       "lib/scrape-runner.js",
