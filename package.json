@@ -28,6 +28,16 @@
       "output": "release"
     },
     "electronDist": "node_modules/electron/dist",
+    "extraResources": [
+      {
+        "from": "node_modules/call-bind-apply-helpers",
+        "to": "node_modules/call-bind-apply-helpers"
+      },
+      {
+        "from": "node_modules/es-abstract-get",
+        "to": "node_modules/es-abstract-get"
+      }
+    ],
     "files": [
       "package.json",
       "server.js",

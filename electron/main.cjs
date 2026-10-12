@@ -85,6 +85,12 @@ function startServer() {
         ELECTRON_RUN_AS_NODE: '1',
         ENGINE_MODE: app.isPackaged ? 'client' : (process.env.ENGINE_MODE || 'local'),
         ENGINE_URL: process.env.ENGINE_URL || 'https://insta.dewa.ai.id',
+        // Lisensi tetap di VPS: aktivasi selalu diverifikasi online ke
+        // engine (allowlist + revocation); offline = fallback lokal.
+        ...(app.isPackaged ? { LICENSE_SERVER_URL: process.env.LICENSE_SERVER_URL || 'https://insta.dewa.ai.id' } : {}),
+        // Fallback resolution untuk modul produksi yang lolos dari pruning
+        // dependency builder (disalin via extraResources ke resources/).
+        ...(app.isPackaged ? { NODE_PATH: path.join(process.resourcesPath, 'node_modules') } : {})
       },
       stdio: logStream ? ['ignore', logStream, logStream] : 'ignore',
       windowsHide: true,

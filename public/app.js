@@ -744,7 +744,69 @@ async function triggerConnectInstagram() {
       showToast('Akun Instagram berhasil terhubung! Sesi login Anda tersimpan.', 'success');
     }
   } else {
-    showToast('Buka di aplikasi desktop Insta Scraper Studio untuk menghubungkan akun Instagram.', 'info');
+    // Mode browser/dev: tempel cookie manual (Electron tak tersedia)
+    openSessionModal();
+  }
+}
+
+function parseCookieInput(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  // Terima header Cookie lengkap ATAU nilai sessionid mentah
+  const jar = text.includes('=') ? text : `sessionid=${text}`;
+  const get = (name) => {
+    const m = jar.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+    return m ? m[1].trim() : null;
+  };
+  const sessionId = get('sessionid');
+  if (!sessionId || sessionId.length < 10) return null;
+  const out = {
+    sessionId,
+    csrfToken: get('csrftoken'),
+    userId: get('ds_user_id'),
+  };
+  // Simpan jar lengkap bila memang format cookie (butuh mid/ig_did/dll)
+  if (text.includes('=')) out.cookies = jar;
+  return out;
+}
+
+function openSessionModal() {
+  const m = document.getElementById('sessionModal');
+  if (m) {
+    m.hidden = false;
+    const input = document.getElementById('sessionCookieInput');
+    if (input) setTimeout(() => input.focus(), 50);
+  }
+}
+
+function closeSessionModal() {
+  const m = document.getElementById('sessionModal');
+  if (m) m.hidden = true;
+}
+
+async function handleSaveSession() {
+  const input = document.getElementById('sessionCookieInput');
+  const errBox = document.getElementById('sessionError');
+  const showErr = (msg) => { if (errBox) { errBox.textContent = msg; errBox.style.display = 'block'; } };
+  const session = parseCookieInput(input ? input.value : '');
+  if (!session) {
+    showErr('Cookie tidak valid — pastikan memuat sessionid.');
+    return;
+  }
+  if (errBox) errBox.style.display = 'none';
+  try {
+    const res = await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    });
+    if (!res.ok) throw new Error('Server menolak sesi');
+    closeSessionModal();
+    if (input) input.value = '';
+    await checkHealth(true);
+    showToast('Sesi Instagram tersimpan di perangkat ini.', 'success');
+  } catch {
+    showErr('Gagal menyimpan sesi. Pastikan server berjalan lalu coba lagi.');
   }
 }
 
@@ -757,6 +819,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Putuskan sesi Instagram
   if (btnLogoutIG) btnLogoutIG.addEventListener('click', logoutInstagram);
+
+  // Modal sesi manual (mode browser/dev)
+  const sessionClose = document.getElementById('sessionClose');
+  const btnSaveSession = document.getElementById('btnSaveSession');
+  const sessionModal = document.getElementById('sessionModal');
+  if (sessionClose) sessionClose.addEventListener('click', closeSessionModal);
+  if (btnSaveSession) btnSaveSession.addEventListener('click', handleSaveSession);
+  if (sessionModal) sessionModal.addEventListener('click', (e) => { if (e.target === sessionModal) closeSessionModal(); });
 
   // Start Scrape
   if (btnStartScrape) {

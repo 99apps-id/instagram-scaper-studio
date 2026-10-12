@@ -277,6 +277,29 @@
   </div>
 
   <!-- LICENSE MODAL (Onboarding / Trial / Status / Aktivasi / Kedaluwarsa) -->
+  <!-- MANUAL SESSION MODAL (mode browser/dev tanpa Electron) -->
+  <div class="license-backdrop" id="sessionModal" hidden>
+    <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="sessionTitle" style="max-width: 520px;">
+      <div class="drawer-header">
+        <h2 id="sessionTitle">Hubungkan Instagram Manual</h2>
+        <button class="drawer-close" id="sessionClose" aria-label="Tutup">✕</button>
+      </div>
+      <div class="drawer-content">
+        <p style="font-size: 0.78rem; color: var(--ink-muted); line-height: 1.6;">
+          Login ke <b>instagram.com</b> di browser, tekan <b>F12 → Application → Cookies → https://www.instagram.com</b>,
+          salin seluruh nilai <b>Cookie</b> (atau cukup <b>sessionid</b>), lalu tempel di bawah.
+          Sesi hanya tersimpan di perangkat ini.
+        </p>
+        <div class="drawer-section-title" style="margin-top: 0.85rem;">Cookie / sessionid</div>
+        <textarea id="sessionCookieInput" class="drawer-input" rows="4" style="text-transform: none; resize: vertical;" placeholder="sessionid=ABC123...; csrftoken=...; ds_user_id=...;" spellcheck="false" autocomplete="off" aria-label="Cookie Instagram"></textarea>
+        <div id="sessionError" style="font-size: 0.75rem; color: var(--accent-rose); margin-top: 0.5rem; min-height: 1.2rem; display: none;"></div>
+        <div class="drawer-btn-row">
+          <button class="btn btn-primary" id="btnSaveSession" style="flex: 1;">Simpan Sesi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="license-backdrop" id="licenseModal" hidden>
     <div class="license-card" role="dialog" aria-modal="true" aria-labelledby="licenseTitle">
       <div class="license-brand">
